@@ -37,14 +37,14 @@ def generate(formula, traces_file, no_traces=100):
     alphabet, dfa = translate(formula, kind=DFAType.Infinity, optimize=True)
     alphabet = [set([s]) for s in alphabet] + [set()]
     
-    print 'alphabet:', alphabet 
+    print('alphabet:', alphabet )
     
     data = {'positive': [], 'negative': []}
     
     both = 0
     
     for k in range(no_traces):
-        print 'k:', k
+        print('k:', k)
         
         state = iter(dfa.init).next()
         w = []
@@ -74,7 +74,7 @@ def generate(formula, traces_file, no_traces=100):
                     data['negative'].append(w)
                 break
     
-    print 'done', len(data['positive']), len(data['negative']), both
+    print('done', len(data['positive']), len(data['negative']), both)
     
 #     for w in data['positive']:
 #         print 'length:', len(w)

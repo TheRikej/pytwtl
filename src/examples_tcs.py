@@ -26,7 +26,7 @@ license_text='''
 '''
 
 import logging, sys
-import StringIO
+from io import StringIO
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -83,7 +83,7 @@ def case1_synthesis(formula, ts_file):
             logging.info('Generated output word is: %s', [tuple(o) for o in output])
             
             policy = [x for x in policy if x not in ets.state_map]
-            out = StringIO.StringIO()
+            out = StringIO()
             for u, v in zip(policy[:-1], policy[1:]):
                 print>>out, u, '->', ts.g[u][v][0]['duration'], '->',
             print>>out, policy[-1],
@@ -108,7 +108,7 @@ def case2_verification(formula, ts_file):
     ts.g.add_edges_from(ts.g.edges(), weight=1)
     
     for u, v in ts.g.edges_iter():
-        print u, '->', v
+        print(u, '->', v)
     
     result = verify(ts, dfa_inf)
     logging.info('The result of the verification procedure is %s!', result)

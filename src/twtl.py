@@ -59,16 +59,16 @@ def monitor(formula=None, kind=None, dfa=None, cutoff=None):
     
     if  kind == DFAType.Normal:
         if formula is not None:
-            seq = xrange((norm(formula) if cutoff is None else cutoff) + 1)
+            seq = range((norm(formula) if cutoff is None else cutoff) + 1)
         else:
-            seq = xrange(cutoff + 1)
+            seq = range(cutoff + 1)
     elif kind == DFAType.Infinity:
-        seq = it.count() if cutoff is None else xrange(cutoff + 1)
+        seq = it.count() if cutoff is None else range(cutoff + 1)
     else:
         raise ValueError('DFA type must be either DFAType.Normal, ' +
                        'DFAType.Infinity or "both"! {} was given!'.format(kind))
     
-    state = dfa.init.keys()[0]
+    state = list(dfa.init.keys())[0] # dfa.init.keys()[0] 
     ret = 0
     for _ in seq:
         symbol = yield ret
@@ -126,12 +126,12 @@ def _update_tree(tree, state, prev_state, symbol, constraint=None):
         _update_tree(tree.right, state, prev_state, symbol, constraint)
     elif tree.operation == Op.union:
         if constraint is None:
-            c_left = {s: ch.both | ch.left for s, ch in tree.choices.iteritems()}
-            c_right = {s: ch.both | ch.right for s, ch in tree.choices.iteritems()}
+            c_left = {s: ch.both | ch.left for s, ch in tree.choices.items()}
+            c_right = {s: ch.both | ch.right for s, ch in tree.choices.items()}
         else:
             c_left = dict()
             c_right = dict()
-            for s in tree.choices.viewkeys() & constraint.viewkeys():
+            for s in tree.choices.keys() & constraint.keys():
                 c_left[s] = constraint[s] & (tree.choices[s].both | tree.choices[s].left)
                 c_right[s] = constraint[s] & (tree.choices[s].both | tree.choices[s].right)
         _update_tree(tree.left, state, prev_state, symbol, c_left)
@@ -190,7 +190,7 @@ def temporal_relaxation(word, formula=None, dfa=None):
 #     logging.debug('Init:\n%s', _debug_pprint_tree(dfa.tree))
     
     prev_state = None
-    state = dfa.init.keys()[0]
+    state = list(dfa.init.keys())[0] # dfa.init.keys()[0]
     prev_w = set()
     for w in word + [set([])]: # hack to catch the last state
         # start/stop counters and increment all active counters
@@ -322,6 +322,6 @@ if __name__ == '__main__':
     res = translate('[H^2 A]^[0, 4] | [H^2 B]^[2, 5]',
                     kind=DFAType.Infinity, norm=True)
     
-    print res
-    print res[1].g.nodes()
-    
+    print(res)
+    print(res[1].g.nodes())
+

@@ -30,6 +30,7 @@ license_text='''
 import logging
 import itertools as it
 from operator import attrgetter
+from io import StringIO
 
 import numpy as np
 import networkx as nx
@@ -328,7 +329,7 @@ def partial_control_policies2(pa, dfa, init, finish, constraint=None):
     logging.debug('[PartialControl] init: %s, final: %s, constraint: %s',
                   init, finish, constraint)
     if constraint is not None:
-        C = constraint.viewkeys()
+        C = constraint.keys()
     
     sat_paths = []
     for source in (p for p in pa.g.nodes_iter() if p[1] in init):
@@ -406,12 +407,12 @@ def relaxed_control_policy(tree, dfa, pa, constraint=None):
     
     if tree.operation == Op.union:
         if constraint is None:
-            c_left = {s: ch.both | ch.left for s, ch in tree.choices.iteritems()}
-            c_right = {s: ch.both | ch.right for s, ch in tree.choices.iteritems()}
+            c_left = {s: ch.both | ch.left for s, ch in tree.choices.items()}
+            c_right = {s: ch.both | ch.right for s, ch in tree.choices.items()}
         else:
             c_left = dict()
             c_right = dict()
-            for s in tree.choices.viewkeys() & constraint.viewkeys():
+            for s in tree.choices.keys() & constraint.keys():
                 c_left[s] = constraint[s] & (tree.choices[s].both | tree.choices[s].left)
                 c_right[s] = constraint[s] & (tree.choices[s].both | tree.choices[s].right)
         

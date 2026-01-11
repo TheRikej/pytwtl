@@ -25,6 +25,7 @@ import copy
 from .dijkstra import *
 import logging
 import pp
+import pickle as pickle
 
 # Logger configuration
 logger = logging.getLogger(__name__)
@@ -82,9 +83,9 @@ def optimal_run(t, formula, opt_prop):
 		return (prefix_length, prefix, suffix_cycle_cost, suffix_cycle)
 	except Exception as ex:
 		if(len(ex.args) == 2):
-			print "%s: %s" % ex.args
+			print("%s: %s" % ex.args)
 		else:
-			print "%s: Unknown exception %s: %s" % (__name__, type(ex), ex)
+			print("%s: Unknown exception %s: %s" % (__name__, type(ex), ex))
 			exc_type, exc_value, exc_traceback = sys.exc_info()
 			traceback.print_tb(exc_traceback)
 			exit(1)
@@ -120,7 +121,7 @@ def job_worker(chunk, data_source, func_name):
 	global data_id
 	global my_data
 	import socket
-	import cPickle
+	import pickle
 
 	need_data = False
 
@@ -149,9 +150,9 @@ def job_worker(chunk, data_source, func_name):
 				break
 			new_data += this_data
 		sock.close()
-		my_data = cPickle.loads(new_data)
-		# set the data_id
+		my_data = pickle.loads(new_data)
 		data_id = new_data_id
+
 
 	# Call the dijkstra routine for this source_chunk
 	return eval(func_name+'(chunk, *my_data)')
@@ -159,10 +160,10 @@ def job_worker(chunk, data_source, func_name):
 def job_dispatcher(job_server, func, arg_to_split, chunk_size, data_id, data, data_source):
 	import socket
 	import threading
-	import SocketServer
-	import cPickle
+	import socketserver as SocketServer
+	import pickle
 
-	pickled_data = cPickle.dumps(data,cPickle.HIGHEST_PROTOCOL)
+	pickled_data = pickle.dumps(data, pickle.HIGHEST_PROTOCOL)
 
 	# Data Server Configuration
 	class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):

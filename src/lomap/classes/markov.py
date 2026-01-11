@@ -157,7 +157,7 @@ class Markov(Model):
 		------
 		Only works for a regular weighted deterministic transition system (not a nondet or team ts).
 		"""
-		if(traveling_states and isinstance(q, tuple) and len(q)==3 and isinstance(q[2], (int, float, long))):
+		if(traveling_states and isinstance(q, tuple) and len(q)==3 and isinstance(q[2], (int, float))):
 			# q is a tuple of the form (source, target, elapsed_time)
 			source, target, elapsed_time = q
 			# the last [0] is required because MultiDiGraph edges have keys

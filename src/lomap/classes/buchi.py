@@ -218,7 +218,7 @@ Edges: {edges}
 
 		# Copy the old props
 		det.props = dict()
-		for k,v in self.props.iteritems():
+		for k,v in self.props.items():
 			det.props[k] = v
 
 		# Discover states and transitions
@@ -235,7 +235,7 @@ Edges: {edges}
 						next_states[inp] = set()
 					next_states[inp].add(next_state)
 
-			for inp,next_state_set in next_states.iteritems():
+			for inp,next_state_set in next_states.items():
 				if next_state_set not in state_map:
 					state_map.append(next_state_set)
 				next_state_i = state_map.index(next_state_set)

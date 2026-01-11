@@ -71,7 +71,7 @@ tokenNames = [
 
 
 class twtl2dfa(TreeParser):
-    grammarFileName = "C:\\Users\\Cristian\\Dropbox\\work\\workspace\\TWTL\\src\\twtl2dfa.g"
+    grammarFileName = "C:\\Users\\Cristian\\Dropbox\\work\\workspace\\TWTL\\src\\twtl2dfa.g" # TODO: WTF
     antlr_version = version_str_to_tuple("3.1.3 Mar 18, 2009 10:09:25")
     antlr_version_str = "3.1.3 Mar 18, 2009 10:09:25"
     tokenNames = tokenNames
@@ -135,7 +135,7 @@ class twtl2dfa(TreeParser):
 
 
 
-            except RecognitionException, re:
+            except RecognitionException as re:
                 self.reportError(re)
                 self.recover(self.input, re)
         finally:
@@ -338,7 +338,7 @@ class twtl2dfa(TreeParser):
 
 
 
-            except RecognitionException, re:
+            except RecognitionException as re:
                 self.reportError(re)
                 self.recover(self.input, re)
         finally:

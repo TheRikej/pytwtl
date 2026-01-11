@@ -368,7 +368,7 @@ Edges: {edges}
 		self.g.add_edges_from([(state, 'virtual') for state in self.final])
 		# compute trap states
 		trap_states = set(self.g.nodes_iter())
-		trap_states -= set(nx.shortest_path_length(self.g, target='virtual').iterkeys())
+		trap_states -= set(nx.shortest_path_length(self.g, target='virtual').keys())
 		# remove trap state and virtual state
 		self.g.remove_nodes_from(trap_states | set(['virtual']))
 		return len(trap_states - set(['virtual'])) == 0
