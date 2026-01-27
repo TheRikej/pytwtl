@@ -19,7 +19,7 @@ import re
 import subprocess as sp
 import itertools as it
 import operator as op
-from model import Model
+from lomap.classes.model import Model
 from . import ltl2ba_binary
 import logging
 
@@ -196,7 +196,7 @@ Edges: {edges}
 		# Get the bitmap representation of props
 		prop_bitmap = self.bitmap_of_props(props)
 		# Return an array of next states
-		return [v for _, v, d in self.g.out_edges_iter(q, data=True)
+		return [v for _, v, d in self.g.out_edges(q, data=True)
 												   if prop_bitmap in d['input']]
 
 	def determinize(self):
@@ -229,7 +229,7 @@ Edges: {edges}
 			cur_state_set = state_map[cur_state_i]
 			next_states = dict()
 			for cur_state in cur_state_set:
-				for _,next_state,data in self.g.out_edges_iter(cur_state, True):
+				for _,next_state,data in self.g.out_edges(cur_state, True):
 					inp = iter(data['input']).next()
 					if inp not in next_states:
 						next_states[inp] = set()
@@ -248,7 +248,7 @@ Edges: {edges}
 		# All edges of all states must be deterministic
 		for state in det.g:
 			ins = set()
-			for u,v,d in det.g.out_edges_iter(state,True):
+			for u,v,d in det.g.out_edges(state,True):
 				assert len(d['input']) == 1
 				inp = iter(d['input']).next()
 				if inp in ins:

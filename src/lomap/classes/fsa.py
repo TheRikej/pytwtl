@@ -19,7 +19,7 @@ import re
 import subprocess as sp
 import itertools as it
 import operator as op
-from model import Model
+from lomap.classes.model import Model
 from . import scheck_binary
 import logging
 
@@ -166,9 +166,9 @@ Edges: {edges}
 		# scheck expects a prefix co-safe ltl formula w/ props: p0, p1, ...
 
 		# Get the set of propositions
-		props = re.sub('[IGFX!\(\)&|U]', ' ', formula)
+		props = re.sub(r'[IGFX!\(\)&|U]', ' ', formula)
 		# TODO: implement true/false support
-		props = set(re.sub('\s+', ' ', props).strip().split())
+		props = set(re.sub(r'\s+', ' ', props).strip().split())
 
 		# Form the bitmap dictionary of each proposition
 		# Note: range goes upto rhs-1
@@ -328,7 +328,7 @@ Edges: {edges}
 		guard = re.sub(r'\(0\)', 'set()', guard)
 
 		# Handler negated sets
-		guard = re.sub('!self.symbols_w_prop', 'self.symbols_wo_prop', guard)
+		guard = re.sub(r'!self.symbols_w_prop', 'self.symbols_wo_prop', guard)
 
 		# Convert logic connectives
 		guard = re.sub(r'\&\&', '&', guard)
@@ -341,19 +341,21 @@ Edges: {edges}
 		Adds a trap state and completes the automaton. Returns True whenever a
 		trap state has been added to the automaton.
 		"""
+		self.g.add_node('trap')
 		trap_added = False
 		for s in self.g.nodes():
 			rem_alphabet = set(self.alphabet)
-			for _, _, d in self.g.out_edges_iter(s, data=True):
-				rem_alphabet -= d['input']
+			for _, _, d in self.g.out_edges(s, data=True):
+				if 'input' in d:
+					rem_alphabet -= d['input']
 			if rem_alphabet:
 				if not trap_added: #'trap' not in self.g:
-					self.g.add_node('trap')
 					self.g.add_edge('trap', 'trap', attr_dict={'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': '(1)'})
 					trap_added = True
 				self.g.add_edge(s,'trap', attr_dict={'weight': 0, 'input': rem_alphabet, 'guard': 'trap_guard', 'label': 'trap_guard'})
 
 		if not trap_added:
+			self.g.remove_node('trap')
 			logger.info('No trap states were added.')
 		else:
 			logger.info('Trap states were added.')
@@ -367,7 +369,7 @@ Edges: {edges}
 		# add virtual state which has incoming edges from all final states
 		self.g.add_edges_from([(state, 'virtual') for state in self.final])
 		# compute trap states
-		trap_states = set(self.g.nodes_iter())
+		trap_states = set(self.g.nodes())
 		trap_states -= set(nx.shortest_path_length(self.g, target='virtual').keys())
 		# remove trap state and virtual state
 		self.g.remove_nodes_from(trap_states | set(['virtual']))
@@ -401,6 +403,6 @@ Edges: {edges}
 		# Get the bitmap representation of props
 		prop_bitmap = self.bitmap_of_props(props)
 		# Return an array of next states
-		return [v for _, v, d in self.g.out_edges_iter(q, data=True)
+		return [v for _, v, d in self.g.out_edges(q, data=True)
 												   if prop_bitmap in d['input']]
 

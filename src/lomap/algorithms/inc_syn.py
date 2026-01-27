@@ -53,7 +53,7 @@ def minimize_mdp(mdp, exp_rwd, exp_rwd_ver):
 	# the controls to be removed
 	cnt = 0
 	for s in mdp.g:
-		for _,t,key,d in mdp.g.out_edges_iter((s,), data=True, keys=True):
+		for _,t,key,d in mdp.g.out_edges((s,), data=True, keys=True):
 			if d['control'] not in ctrls_to_keep[s]:
 				mdp.g.remove_edge(s, t, key)
 				#logger.info('Removed %s -%s-> %s' % (s, d['control'][0], t))

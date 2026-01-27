@@ -213,12 +213,12 @@ def expand_duration_ts(ts):
     ets.init = ts.init
     
     # copy nodes with data
-    ets.g.add_nodes_from(ts.g.nodes_iter(data=True))
+    ets.g.add_nodes_from(ts.g.nodes(data=True))
     
     # expand edges
     ets.state_map = dict() # reverse lookup dictionary for intermediate nodes
     ng = it.count()
-    for u, v, data in ts.g.edges_iter(data=True):
+    for u, v, data in ts.g.edges(data=True):
         # generate intermediate nodes
         aux_nodes = [u] + [ng.next() for _ in range(data['duration']-1)] + [v]
         u_pos = np.array(ts.g.node[u]['position'])
@@ -296,7 +296,7 @@ def partial_control_policies(pa, dfa, init, finish, constraint=None):
     logging.debug('[PartialControl] init: %s, final: %s, constraint: %s',
                   init, finish, constraint)
     sat_paths = []
-    for state in (p for p in pa.g.nodes_iter() if p[1] in init):
+    for state in (p for p in pa.g.nodes() if p[1] in init):
         paths = nx.shortest_path(pa.g, source=state)
         if constraint is None:
             sat_paths.extend([path for p, path in paths.iteritems()
@@ -332,7 +332,7 @@ def partial_control_policies2(pa, dfa, init, finish, constraint=None):
         C = constraint.keys()
     
     sat_paths = []
-    for source in (p for p in pa.g.nodes_iter() if p[1] in init):
+    for source in (p for p in pa.g.nodes() if p[1] in init):
         level=1                  # the current level
         nextlevel={source:1}     # list of nodes to check at next level
         paths={source:[source]}  # paths dictionary  (paths to key from source)
@@ -379,7 +379,7 @@ def relaxed_control_policy(tree, dfa, pa, constraint=None):
         M_ch = relaxed_control_policy(tree.left, dfa, pa, constraint)
         if tree.low == 0:
             for cpath in M_ch:
-                cpath.tau = max(len(cpath.path) - tree.high - 1, path.tau)
+                cpath.tau = max(len(cpath.path) - tree.high - 1, path.tau) #TODO path not defined?
             return M_ch
         
         M = ControlPathsSet()
@@ -470,7 +470,7 @@ def verify(ts, dfa):
     logging.info('Product automaton size is: (%d, %d)', *pa.size())
     
     return nx.is_directed_acyclic_graph(pa.g) and pa.final and \
-            all([pa.g.out_degree(u) > 0 for u in pa.g.nodes_iter()
+            all([pa.g.out_degree(u) > 0 for u in pa.g.nodes()
                                             if u not in pa.final])
 
 if __name__ == '__main__':

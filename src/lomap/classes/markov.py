@@ -17,7 +17,7 @@
 import networkx as nx
 import re
 import itertools
-from model import Model
+from lomap.classes.model import Model
 import copy
 
 class FileError(Exception):
@@ -38,7 +38,7 @@ class Markov(Model):
 			raise Exception()
 		if ts.init[ts.init.keys()[0]] != 1:
 			raise Exception()
-		for u,v,key in self.g.edges_iter(keys=True):
+		for u,v,key in self.g.edges(keys=True):
 			self.g.edge[u][v][key]['prob'] = 1.0
 	
 	def read_from_file(self, path): 
@@ -169,12 +169,12 @@ class Markov(Model):
 		else:
 			# q is a normal state of the markov model
 			r = []
-			for source, target, data in self.g.out_edges_iter((q,), data=True):
+			for source, target, data in self.g.out_edges((q,), data=True):
 				r.append((target, data['weight'], data.get('control', None), data['prob']))
 			return tuple(r)
 
 	def iter_action_edges(self, s, a, keys=False):
-		for _,t,key,d in self.g.out_edges_iter((s,), data=True, keys=True):
+		for _,t,key,d in self.g.out_edges((s,), data=True, keys=True):
 			if d['control'] == a:
 				if keys:
 					yield(t,key,d)
@@ -183,7 +183,7 @@ class Markov(Model):
 	
 	def available_controls(self, s):
 		ctrls = set()
-		for _,_,d in self.g.out_edges_iter((s,), data=True):
+		for _,_,d in self.g.out_edges((s,), data=True):
 			ctrls.add(d['control'])
 		return ctrls
 

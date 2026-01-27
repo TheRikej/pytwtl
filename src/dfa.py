@@ -28,7 +28,7 @@ license_text='''
 import logging
 logger = logging.getLogger(__name__)
 import itertools as it
-from StringIO import StringIO
+from io import StringIO
 
 import networkx as nx
 
@@ -157,7 +157,7 @@ class DFATreeNode(object):
                 tree.final = set([mapping[u] for u in tree.final])
                 if tree.operation == Op.union:
                     tree.choices = dict([(mapping[k], v)
-                                          for k, v in tree.choices.iteritems()])
+                                          for k, v in tree.choices.items()])
             if tree.right is not None:
                 stack.append(tree.right)
             if tree.left is not None:
@@ -270,18 +270,18 @@ def mark_product(dfa_src1, dfa_src2, dfa_dest, operation, choices=None):
     operator and adds it to the destination automaton `dfa_dest`. The children
     subtrees are copied from the source automata `dfa_src1` and `dfa_src2`.
     '''
-    final_dest = iter(dfa_dest.final).next()
-    final_src1 = iter(dfa_src1.final).next()
-    final_src2 = iter(dfa_src2.final).next()
+    final_dest = iter(dfa_dest.final).__next__()
+    final_src1 = iter(dfa_src1.final).__next__()
+    final_src2 = iter(dfa_src2.final).__next__()
     # relabel data in left tree
-    mapping = dict([(u, []) for u in dfa_src1.g.nodes_iter()])
-    for u, v in dfa_dest.g.nodes_iter():
+    mapping = dict([(u, []) for u in dfa_src1.g.nodes()])
+    for u, v in dfa_dest.g.nodes():
         mapping[u].append((u, v))
     assert final_dest in mapping[final_src1]
     dfa_src1.tree.relabel(mapping, expand=True)
     # relabel data in right tree
-    mapping = dict([(v, []) for v in dfa_src2.g.nodes_iter()])
-    for u, v in dfa_dest.g.nodes_iter():
+    mapping = dict([(v, []) for v in dfa_src2.g.nodes()])
+    for u, v in dfa_dest.g.nodes():
         mapping[v].append((u, v))
     assert final_dest in mapping[final_src2]
     dfa_src2.tree.relabel(mapping, expand=True)
@@ -301,7 +301,7 @@ def mark_product(dfa_src1, dfa_src2, dfa_dest, operation, choices=None):
                         + (operation == Op.union)
 
 
-def relabel_dfa(dfa, mapping='default', start=0, copy=False):
+def relabel_dfa(dfa, mapping=None, start=0, copy=False):
     '''Relabels the DFA. The new labels are given by the mapping dictionary. By
     default, it relabels the states with integers with the lowest one given by
     start. The dictionary can be a partial mapping of the nodes. The states
@@ -309,10 +309,10 @@ def relabel_dfa(dfa, mapping='default', start=0, copy=False):
     If copy is True a new copy of the DFA is returned, otherwise it performs an
     in-place relabeling.
     '''
-    if mapping is 'default': # default mapping
+    if mapping is None: # default mapping
         mapping = dict()
     keys = mapping.keys()
-    nodes = [u for u in dfa.g.nodes_iter() if u not in keys]
+    nodes = [u for u in dfa.g.nodes() if u not in keys]
     mapping.update(dict(zip(nodes, it.count(start))))
     
     if copy: # create new dfa
@@ -364,7 +364,7 @@ def accept_prop(props, prop=None, boolean=None):
     bitmaps = dfa.get_guard_bitmap(guard)
     ngen = it.count()
     u, v = ngen.next(), ngen.next()
-    dfa.g.add_edge(u, v, attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+    dfa.g.add_edge(u, v, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
     dfa.init[u] = 1
     dfa.final.add(v)
     
@@ -385,9 +385,9 @@ def hold(props, prop, duration, negation=False):
     bitmaps = dfa.get_guard_bitmap(guard)
     
     ngen = it.count()
-    nodes = [ngen.next() for _ in range(duration+2)]
+    nodes = [ngen.__next__() for _ in range(duration+2)] #TODO
     attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard}
-    dfa.g.add_path(nodes, **attr_dict)
+    nx.add_path(dfa.g, nodes, **attr_dict)
     
     u, v = nodes[0], nodes[-1]
     dfa.init[u] = 1
@@ -432,8 +432,8 @@ def concatenation(dfa1, dfa2):
     final1 = iter(dfa1.final).next()
     relabel_dfa(dfa2, mapping={init2: final1}, start=dfa1.g.number_of_nodes())
     assert len(set(dfa1.g.nodes()) & set(dfa2.g.nodes())) == 1
-    dfa.g.add_edges_from(dfa1.g.edges_iter(data=True))
-    dfa.g.add_edges_from(dfa2.g.edges_iter(data=True))
+    dfa.g.add_edges_from(dfa1.g.edges(data=True))
+    dfa.g.add_edges_from(dfa2.g.edges(data=True))
     
     # define initial state and final state
     dfa.init = dict(dfa1.init)
@@ -474,28 +474,29 @@ def intersection(dfa1, dfa2):
     stack = list(init)
     while stack:
         u1, u2 = stack.pop()
-        for _, v1, d1 in dfa1.g.edges_iter(u1, data=True):
-            for _, v2, d2 in dfa2.g.edges_iter(u2, data=True):
+        for _, v1, d1 in dfa1.g.edges(u1, data=True):
+            for _, v2, d2 in dfa2.g.edges(u2, data=True):
                 bitmaps = d1['input'] & d2['input']
                 if bitmaps:
                     if (v1, v2) not in dfa.g:
                         stack.append((v1, v2))
                     guard = '({}) & ({})'.format(d1['guard'], d2['guard'])
-                    dfa.g.add_edge((u1, u2), (v1, v2), attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+                    attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard}
+                    dfa.g.add_edge((u1, u2), (v1, v2), **attr_dict)
         if u1 in dfa1.final:
-            for _, v2, d2 in dfa2.g.edges_iter(u2, data=True):
+            for _, v2, d2 in dfa2.g.edges(u2, data=True):
                 if (u1, v2) not in dfa.g:
                     stack.append((u1, v2))
                 bitmaps = set(d2['input'])
                 guard = d2['guard']
-                dfa.g.add_edge((u1, u2), (u1, v2), attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+                dfa.g.add_edge((u1, u2), (u1, v2), **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
         if u2 in dfa2.final:
-            for _, v1, d1 in dfa1.g.edges_iter(u1, data=True):
+            for _, v1, d1 in dfa1.g.edges(u1, data=True):
                 if (v1, u2) not in dfa.g:
                     stack.append((v1, u2))
                 bitmaps = set(d1['input'])
                 guard = d1['guard']
-                dfa.g.add_edge((u1, u2), (v1, u2), attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+                dfa.g.add_edge((u1, u2), (v1, u2), **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
     
     # the set of final states is the product of final sets of dfa1 and dfa2
     dfa.final = set(it.product(dfa1.final, dfa2.final))
@@ -516,7 +517,7 @@ def intersection(dfa1, dfa2):
     logger.debug('[intersection] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
     return dfa
 
-def union(dfa1, dfa2):
+def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     '''Creates a DFA which accepts the union of the languages corresponding to
     the two DFAs. The disjunction operation of TWTL is mapped to union.
     If an infinity DFA is generated, the corresponding meta-data is copied as
@@ -533,8 +534,8 @@ def union(dfa1, dfa2):
     
     # add self-loops on final states and trap states
     attr_dict={'weight': 0, 'input': dfa.alphabet, 'guard' : '(1)', 'label': '(1)'}
-    dfa1.g.add_edges_from([(s, s, attr_dict) for s in dfa1.final])
-    dfa2.g.add_edges_from([(s, s, attr_dict) for s in dfa2.final])
+    dfa1.g.add_edges_from([(s, s, attr_dict) for s in dfa1.final], **attr_dict)
+    dfa2.g.add_edges_from([(s, s, attr_dict) for s in dfa2.final], **attr_dict)
     dfa1.add_trap_state()
     dfa2.add_trap_state()
     dfa1.g.remove_edges_from([(s, s) for s in dfa1.final])
@@ -547,17 +548,18 @@ def union(dfa1, dfa2):
     stack = list(init)
     while stack:
         u1, u2 = stack.pop()
-        for _, v1, d1 in dfa1.g.edges_iter(u1, data=True):
-            for _, v2, d2 in dfa2.g.edges_iter(u2, data=True):
+        for x, v1, d1 in dfa1.g.edges(u1, data=True):
+            for y, v2, d2 in dfa2.g.edges(u2, data=True):
                 bitmaps = d1['input'] & d2['input']
                 if bitmaps:
                     if (v1, v2) not in dfa.g:
                         stack.append((v1, v2))
                     guard = '({}) & ({})'.format(d1['guard'], d2['guard'])
-                    dfa.g.add_edge((u1, u2), (v1, v2), attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+                    attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard}
+                    dfa.g.add_edge((u1, u2), (v1, v2), **attr_dict)
     
     # compute set of final states
-    dfa.final = set([(u, v) for u, v in dfa.g.nodes_iter()
+    dfa.final = set([(u, v) for u, v in dfa.g.nodes()
                                          if u in dfa1.final or v in dfa2.final])
     
     # remove trap states
@@ -567,17 +569,21 @@ def union(dfa1, dfa2):
     
     # merge finals
     if len(dfa.final) > 1:
-        final = (iter(dfa1.final).next(), iter(dfa2.final).next())
+        final = (iter(dfa1.final).__next__(), iter(dfa2.final).__next__())
         # satisfies both left and right sub-formulae
-        choices = dict([(u, Choice(both=d['input']))
-                               for u, _, d in dfa.g.in_edges(final, data=True)])
-        for u, v, d in dfa.g.in_edges_iter(dfa.final - set([final]), data=True):
+        # choices = dict([(u, Choice(both=d['input']))
+        #                        for u, _, d in dfa.g.in_edges(final, data=True)])
+        choices = {}
+        for u, _, d in dfa.g.in_edges(final, data=True):
+            choices[u] = Choice(both=d['input'])
+        for u, v, d in dfa.g.in_edges(dfa.final - set([final]), data=True):
             bitmaps = set(d['input'])
             guard = d['guard']
             if dfa.g.has_edge(u, final):
-                bitmaps |= dfa.g[u][final]['input']
+                x = dfa.g[u][final]
+                bitmaps |= x['input']
                 guard = '({}) | ({})'.format(guard, dfa.g[u][final]['guard'])
-            dfa.g.add_edge(u, final, attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+            dfa.g.add_edge(u, final, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
             if v[0] in dfa1.final: # satisfies only the left sub-formula
                 assert v[1] not in dfa2.final
                 choices.setdefault(u, Choice()).left.update(d['input'])
@@ -616,7 +622,7 @@ def within(phi, low, high):
     else:
         raise ValueError("Within operator deadline is invalid!")
 
-def eventually(phi_dfa, low, high):
+def eventually(phi_dfa: Fsa, low, high):
     '''Creates a DFA which accepts the infinity version of a within operator
     which encloses the formula corresponding to phi_dfa.
     NOTE: Assumes that phi_dfa contains no ``trap'' states, i.e. states which do
@@ -625,26 +631,27 @@ def eventually(phi_dfa, low, high):
     dfa = phi_dfa.clone()
     dfa.name = '(Eventually {} {} {} )'.format(phi_dfa.name, low, high)
     
-    init = dfa.init.keys()[0]
+    init = dfa.init.keys().__iter__().__next__()
     for state in dfa.g.nodes():
         bitmaps = set()
         guard = '(else)'
-        for _, _, d in dfa.g.out_edges_iter(state, data=True):
+        for _, _, d in dfa.g.out_edges(state, data=True):
             bitmaps |= d['input']
         bitmaps = dfa.alphabet - bitmaps
         
         if state not in dfa.final and bitmaps:
-            dfa.g.add_edge(state, init, attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+            attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard}
+            dfa.g.add_edge(state, init, **attr_dict)
     
     # add states to accept a prefix word of any symbol of length low
     if low > 0:
         guard = '(1)'
         bitmaps = dfa.get_guard_bitmap(guard)
-        ngen = it.count(start=dfa.g.number_of_nodes())
-        nodes = [ngen.next() for _ in range(low)]
+        # ngen = it.count(start=dfa.g.number_of_nodes())
+        nodes = [i for i in range(dfa.g.number_of_nodes(), dfa.g.number_of_nodes()+low)] #TODO check
         attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard}
-        dfa.g.add_path(nodes, **attr_dict)
-        dfa.g.add_edge(nodes[-1], init, attr_dict)
+        nx.add_path(dfa.g, nodes, **attr_dict)
+        dfa.g.add_edge(nodes[-1], init, **attr_dict)
         dfa.init = {nodes[0] : 1}
     
     # add counter annotation
@@ -675,14 +682,14 @@ def repeat(phi_dfa, low, high):
     nstates = 0
     for k in range(d):
         # 1. relabel dfa_aux
-        mapping = dict(zip(phi_dfa.g.nodes_iter(),
+        mapping = dict(zip(phi_dfa.g.nodes(),
                          range(nstates, nstates + phi_dfa.g.number_of_nodes())))
         mapping[final_state] = -1 # mark final state as special
         dfa_aux = relabel_dfa(phi_dfa, mapping, copy=True)
         # 2. compute truncated dfa_aux
         truncate_dfa(dfa_aux, cutoff=(high-low+1)-k)
         # 3. add truncated dfa_aux to dfa
-        dfa.g.add_edges_from(dfa_aux.g.edges_iter(data=True))
+        dfa.g.add_edges_from(dfa_aux.g.edges(data=True))
         inits.append(dfa_aux.init.keys()[0])
         nstates += dfa_aux.g.number_of_nodes()
     # set initial and final state
@@ -696,13 +703,13 @@ def repeat(phi_dfa, low, high):
         for state in current_states:
             bitmaps = set()
             guard = '(else)'
-            for _, next_state, d in dfa.g.out_edges_iter(state, data=True):
+            for _, next_state, d in dfa.g.out_edges(state, data=True):
                 bitmaps |= d['input']
                 next_states.add(next_state)
             bitmaps = dfa.alphabet - bitmaps
             
             if state not in dfa.final and bitmaps:
-                dfa.g.add_edge(state, rstate, attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+                dfa.g.add_edge(state, rstate, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
         # update current states
         current_states = next_states | set([rstate])
     
@@ -716,7 +723,7 @@ def repeat(phi_dfa, low, high):
         nodes = [ngen.next() for _ in range(low)]
         attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard}
         dfa.g.add_path(nodes, **attr_dict)
-        dfa.g.add_edge(nodes[-1], dfa.init.keys()[0], attr_dict)
+        dfa.g.add_edge(nodes[-1], dfa.init.keys()[0], **attr_dict)
         dfa.init = {nodes[0] : 1}
     
     logger.debug('[within] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
@@ -748,7 +755,7 @@ def truncate_dfa(dfa, cutoff):
                     nextlevel.append((child, iter(dfa.g[child])))
     
     # remove transitions which are not part of paths of length at most cutoff
-    dfa.g.remove_edges_from([e for e in dfa.g.edges_iter() if e not in edges])
+    dfa.g.remove_edges_from([e for e in dfa.g.edges() if e not in edges])
     # remove all states which do not reach the final states
     dfa.remove_trap_states()
     

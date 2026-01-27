@@ -15,9 +15,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import networkx as nx
-import itertools as it
-from ..algorithms.graph_search import dfs_successors
-from ..algorithms.graph_search import is_reachable_dfs
+# import itertools as it
+# from ..algorithms.graph_search import dfs_successors
+# from ..algorithms.graph_search import is_reachable_dfs
 
 class Model(object):
 	"""

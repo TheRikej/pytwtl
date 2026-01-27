@@ -24,7 +24,7 @@ import traceback
 import copy
 from .dijkstra import *
 import logging
-import pp
+# import pp
 import pickle as pickle
 
 # Logger configuration
@@ -207,145 +207,145 @@ def job_dispatcher(job_server, func, arg_to_split, chunk_size, data_id, data, da
 
 	return jobs
 
-def min_bottleneck_cycle(g, s, f):
-	""" Returns the minimum bottleneck cycle from s to f in graph g.
+# def min_bottleneck_cycle(g, s, f):
+# 	""" Returns the minimum bottleneck cycle from s to f in graph g.
 	
-	An implementation of the Min-Bottleneck-Cycle Algortihm
-	in S.L. Smith, J. Tumova, C. Belta, D. Rus " Optimal Path Planning
-	for Surveillance with Temporal Logic Constraints", in IJRR.
+# 	An implementation of the Min-Bottleneck-Cycle Algortihm
+# 	in S.L. Smith, J. Tumova, C. Belta, D. Rus " Optimal Path Planning
+# 	for Surveillance with Temporal Logic Constraints", in IJRR.
 
-	Parameters
-	----------
-	g : NetworkX graph
+# 	Parameters
+# 	----------
+# 	g : NetworkX graph
 
-	s : A set of nodes
-		These nodes satisfy the optimizing proposition.
+# 	s : A set of nodes
+# 		These nodes satisfy the optimizing proposition.
 		
-	f : A set of nodes
-		These nodes are the final states of B x T product.
+# 	f : A set of nodes
+# 		These nodes are the final states of B x T product.
 
-	Returns
-	-------
-	cycle : List of node labels.
-		The minimum bottleneck cycle S->F->S
+# 	Returns
+# 	-------
+# 	cycle : List of node labels.
+# 		The minimum bottleneck cycle S->F->S
 
-	Examples
-	--------
+# 	Examples
+# 	--------
 
-	Notes
-	-----
+# 	Notes
+# 	-----
 
-	"""
+# 	"""
 
-	# Start job server
-	job_server = pp.Server(ppservers=pp_servers)
+# 	# Start job server
+# 	job_server = pp.Server(ppservers=pp_servers)
 
-	# Compute shortest S->S and S->F paths
-	logger.info('S->S+F')
-	#d = subset_to_subset_dijkstra_path_value(g, s, s|f, degen_paths = False)
-	jobs = job_dispatcher(job_server, subset_to_subset_dijkstra_path_value, list(s), 1, '0', (g, s|f, 'sum', False, 'weight'), data_source)
-	d = dict()
-	for i in range(0,len(jobs)):
-		d.update(jobs[i]())
-		jobs[i]=''
-	del jobs
-	logger.info('Collected results for S->S+F')
+# 	# Compute shortest S->S and S->F paths
+# 	logger.info('S->S+F')
+# 	#d = subset_to_subset_dijkstra_path_value(g, s, s|f, degen_paths = False)
+# 	jobs = job_dispatcher(job_server, subset_to_subset_dijkstra_path_value, list(s), 1, '0', (g, s|f, 'sum', False, 'weight'), data_source)
+# 	d = dict()
+# 	for i in range(0,len(jobs)):
+# 		d.update(jobs[i]())
+# 		jobs[i]=''
+# 	del jobs
+# 	logger.info('Collected results for S->S+F')
 
-	# Create S->S, S->F dict of dicts
-	g_s_edges = []
-	d_s_to_f = dict()
-	for src in d.keys():
-		for dest in d[src].keys():
-			if dest in s:
-				w = d[src][dest]
-				g_s_edges.append((src,dest,w))
-			if dest in f:
-				# We allow degenerate S->F paths
-				w = 0 if src == dest else d[src][dest]
-				if src not in d_s_to_f:
-					d_s_to_f[src] = dict()
-				d_s_to_f[src][dest] = w
+# 	# Create S->S, S->F dict of dicts
+# 	g_s_edges = []
+# 	d_s_to_f = dict()
+# 	for src in d.keys():
+# 		for dest in d[src].keys():
+# 			if dest in s:
+# 				w = d[src][dest]
+# 				g_s_edges.append((src,dest,w))
+# 			if dest in f:
+# 				# We allow degenerate S->F paths
+# 				w = 0 if src == dest else d[src][dest]
+# 				if src not in d_s_to_f:
+# 					d_s_to_f[src] = dict()
+# 				d_s_to_f[src][dest] = w
 
-	# Create the G_s graph
-	g_s = nx.MultiDiGraph()
-	g_s.add_weighted_edges_from(g_s_edges)
-	# Remove d and g_s_edges to save memory
-	del d
-	del g_s_edges
+# 	# Create the G_s graph
+# 	g_s = nx.MultiDiGraph()
+# 	g_s.add_weighted_edges_from(g_s_edges)
+# 	# Remove d and g_s_edges to save memory
+# 	del d
+# 	del g_s_edges
 
-	# Compute shortest F->S paths
-	logger.info('F->S')
-	#d_f_to_s = subset_to_subset_dijkstra_path_value(g, f, s, degen_paths = True)
-	jobs = job_dispatcher(job_server, subset_to_subset_dijkstra_path_value, list(f), 1, '1', (g, s, 'sum', True, 'weight'), data_source)
-	d_f_to_s = dict()
-	for i in range(0,len(jobs)):
-		d_f_to_s.update(jobs[i]())
-		jobs[i]=''
-	del jobs
-	logger.info('Collected results for F->S')
+# 	# Compute shortest F->S paths
+# 	logger.info('F->S')
+# 	#d_f_to_s = subset_to_subset_dijkstra_path_value(g, f, s, degen_paths = True)
+# 	jobs = job_dispatcher(job_server, subset_to_subset_dijkstra_path_value, list(f), 1, '1', (g, s, 'sum', True, 'weight'), data_source)
+# 	d_f_to_s = dict()
+# 	for i in range(0,len(jobs)):
+# 		d_f_to_s.update(jobs[i]())
+# 		jobs[i]=''
+# 	del jobs
+# 	logger.info('Collected results for F->S')
 
-	# Compute shortest S-bottleneck paths between verices in s
-	logger.info('S-bottleneck')
-	#d_bot = subset_to_subset_dijkstra_path_value(g_s, s, s, combine_fn = (lambda a,b: max(a,b)), degen_paths = False)
-	jobs = job_dispatcher(job_server, subset_to_subset_dijkstra_path_value, list(s), 1, '2', (g_s, s, 'max', False, 'weight'), data_source)
+# 	# Compute shortest S-bottleneck paths between verices in s
+# 	logger.info('S-bottleneck')
+# 	#d_bot = subset_to_subset_dijkstra_path_value(g_s, s, s, combine_fn = (lambda a,b: max(a,b)), degen_paths = False)
+# 	jobs = job_dispatcher(job_server, subset_to_subset_dijkstra_path_value, list(s), 1, '2', (g_s, s, 'max', False, 'weight'), data_source)
 
-	d_bot = dict()
-	for i in range(0,len(jobs)):
-		d_bot.update(jobs[i]())
-		jobs[i]=''
-	del jobs
-	logger.info('Collected results for S-bottleneck')
+# 	d_bot = dict()
+# 	for i in range(0,len(jobs)):
+# 		d_bot.update(jobs[i]())
+# 		jobs[i]=''
+# 	del jobs
+# 	logger.info('Collected results for S-bottleneck')
 
-	# Find the triple \in F x S x S that minimizes C(f,s1,s2) 
-	logger.info('Path*')
-	jobs = job_dispatcher(job_server, find_best_cycle, list(f), 1, '3', (s, d_f_to_s, d_s_to_f, d_bot), data_source)
-	cost_star = float('inf')
-	len_star = float('inf')
-	cycle_star = None
-	for i in range(0,len(jobs)):
-		this_cost, this_len, this_cycle = jobs[i]()
-		jobs[i]=''
-		if (this_cost < cost_star or (this_cost == cost_star and this_len < len_star)):
-			cost_star = this_cost
-			len_star = this_len
-			cycle_star = this_cycle
-	del jobs
-	logger.info('Collected results for Path*')
-	logger.info('Cost*: %d, Len*: %d, Cycle*: %s', cost_star, len_star, cycle_star)
+# 	# Find the triple \in F x S x S that minimizes C(f,s1,s2) 
+# 	logger.info('Path*')
+# 	jobs = job_dispatcher(job_server, find_best_cycle, list(f), 1, '3', (s, d_f_to_s, d_s_to_f, d_bot), data_source)
+# 	cost_star = float('inf')
+# 	len_star = float('inf')
+# 	cycle_star = None
+# 	for i in range(0,len(jobs)):
+# 		this_cost, this_len, this_cycle = jobs[i]()
+# 		jobs[i]=''
+# 		if (this_cost < cost_star or (this_cost == cost_star and this_len < len_star)):
+# 			cost_star = this_cost
+# 			len_star = this_len
+# 			cycle_star = this_cycle
+# 	del jobs
+# 	logger.info('Collected results for Path*')
+# 	logger.info('Cost*: %d, Len*: %d, Cycle*: %s', cost_star, len_star, cycle_star)
 
-	if cost_star == float('inf'):
-		raise Exception(__name__, 'Failed to find a satisfying cycle, spec cannot be satisfied.')
+# 	if cost_star == float('inf'):
+# 		raise Exception(__name__, 'Failed to find a satisfying cycle, spec cannot be satisfied.')
 
-	else:
-		logger.info('Extracting Path*')
-		(ff, s1, s2) = cycle_star
-		# This is the F->S1 path
-		(cost_ff_to_s1, path_ff_to_s1) = source_to_target_dijkstra(g, ff, s1, degen_paths = True, cutoff = d_f_to_s[ff][s1])
-		# This is the S2->F path
-		(cost_s2_to_ff, path_s2_to_ff) = source_to_target_dijkstra(g, s2, ff, degen_paths = True, cutoff = d_s_to_f[s2][ff])
-		if s1 == s2 and ff != s1:
-			# The path will be F->S1==S2->F
-			path_star = path_ff_to_s1[0:-1] + path_s2_to_ff
-			assert(cost_star == (cost_ff_to_s1 + cost_s2_to_ff))
-			assert(len_star == (cost_ff_to_s1 + cost_s2_to_ff))
-		else:
-			# The path will be F->S1->S2->F
-			# Extract the path from s_1 to s_2
-			(bot_cost_s1_to_s2, bot_path_s1_to_s2) = source_to_target_dijkstra(g_s, s1, s2, combine_fn = 'max', degen_paths = False, cutoff = d_bot[s1][s2][0])
-			assert(cost_star == max((cost_ff_to_s1 + cost_s2_to_ff),bot_cost_s1_to_s2))
-			path_s1_to_s2 = []
-			cost_s1_to_s2 = 0
-			for i in range(1,len(bot_path_s1_to_s2)):
-				source = bot_path_s1_to_s2[i-1]
-				target = bot_path_s1_to_s2[i]
-				cost_segment, path_segment = source_to_target_dijkstra(g, source, target, degen_paths = False)
-				path_s1_to_s2 = path_s1_to_s2[0:-1] + path_segment
-				cost_s1_to_s2 += cost_segment
-			assert(len_star == cost_ff_to_s1 + cost_s1_to_s2 + cost_s2_to_ff)
+# 	else:
+# 		logger.info('Extracting Path*')
+# 		(ff, s1, s2) = cycle_star
+# 		# This is the F->S1 path
+# 		(cost_ff_to_s1, path_ff_to_s1) = source_to_target_dijkstra(g, ff, s1, degen_paths = True, cutoff = d_f_to_s[ff][s1])
+# 		# This is the S2->F path
+# 		(cost_s2_to_ff, path_s2_to_ff) = source_to_target_dijkstra(g, s2, ff, degen_paths = True, cutoff = d_s_to_f[s2][ff])
+# 		if s1 == s2 and ff != s1:
+# 			# The path will be F->S1==S2->F
+# 			path_star = path_ff_to_s1[0:-1] + path_s2_to_ff
+# 			assert(cost_star == (cost_ff_to_s1 + cost_s2_to_ff))
+# 			assert(len_star == (cost_ff_to_s1 + cost_s2_to_ff))
+# 		else:
+# 			# The path will be F->S1->S2->F
+# 			# Extract the path from s_1 to s_2
+# 			(bot_cost_s1_to_s2, bot_path_s1_to_s2) = source_to_target_dijkstra(g_s, s1, s2, combine_fn = 'max', degen_paths = False, cutoff = d_bot[s1][s2][0])
+# 			assert(cost_star == max((cost_ff_to_s1 + cost_s2_to_ff),bot_cost_s1_to_s2))
+# 			path_s1_to_s2 = []
+# 			cost_s1_to_s2 = 0
+# 			for i in range(1,len(bot_path_s1_to_s2)):
+# 				source = bot_path_s1_to_s2[i-1]
+# 				target = bot_path_s1_to_s2[i]
+# 				cost_segment, path_segment = source_to_target_dijkstra(g, source, target, degen_paths = False)
+# 				path_s1_to_s2 = path_s1_to_s2[0:-1] + path_segment
+# 				cost_s1_to_s2 += cost_segment
+# 			assert(len_star == cost_ff_to_s1 + cost_s1_to_s2 + cost_s2_to_ff)
 
-			# path_ff_to_s1 and path_s2_to_ff can be degenerate paths,
-			# but path_s1_to_s2 cannot, thus path_star is defined as this:
-			# last ff is kept to make it clear that this is a suffix-cycle
-			path_star = path_ff_to_s1[0:-1] + path_s1_to_s2[0:-1] + path_s2_to_ff
+# 			# path_ff_to_s1 and path_s2_to_ff can be degenerate paths,
+# 			# but path_s1_to_s2 cannot, thus path_star is defined as this:
+# 			# last ff is kept to make it clear that this is a suffix-cycle
+# 			path_star = path_ff_to_s1[0:-1] + path_s1_to_s2[0:-1] + path_s2_to_ff
 
-		return (cost_star, path_star)
+# 		return (cost_star, path_star)

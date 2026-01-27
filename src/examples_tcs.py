@@ -44,7 +44,7 @@ def case1_synthesis(formula, ts_file):
     
     logging.debug('alphabet: {}'.format(dfa_inf.props))
     
-    for u, v, d in dfa_inf.g.edges_iter(data=True):
+    for u, v, d in dfa_inf.g.edges(data=True):
         logging.debug('({}, {}): {}'.format(u, v, d))
     
     dfa_inf.visualize(draw='matplotlib')
@@ -70,7 +70,7 @@ def case1_synthesis(formula, ts_file):
         logging.info('Product automaton size is: (%d, %d)', *pa.size())
         
         if name == 'infinity':
-            for u in pa.g.nodes_iter():
+            for u in pa.g.nodes():
                 logging.debug('{} -> {}'.format(u, pa.g.neighbors(u)))
             
             pa.visualize(draw='matplotlib')
@@ -107,7 +107,7 @@ def case2_verification(formula, ts_file):
     ts.g = nx.DiGraph(ts.g)
     ts.g.add_edges_from(ts.g.edges(), weight=1)
     
-    for u, v in ts.g.edges_iter():
+    for u, v in ts.g.edges():
         print(u, '->', v)
     
     result = verify(ts, dfa_inf)

@@ -37,21 +37,21 @@ def minimize(dfa):
     Based on ...
     '''
     # refine partition of states by reversed neighborhoods
-    partition = PartitionRefinement(dfa.g.nodes_iter())
+    partition = PartitionRefinement(dfa.g.nodes())
     partition.refine(dfa.final)
     unrefined = dict([(id(p), p) for p in partition])
     while unrefined:
         part = unrefined.pop(unrefined.iterkeys().next())
         for symbol in dfa.alphabet:
-            neighbors = set([v for v, _, d in dfa.g.in_edges_iter(part, data=True)
+            neighbors = set([v for v, _, d in dfa.g.in_edges(part, data=True)
                                 if symbol in d['input']])
             for new,old in partition.refine(neighbors):
                 if id(old) in unrefined or len(new) < len(old):
                     unrefined[id(new)] = new
                 else:
                     unrefined[id(old)] = old
-    print dfa.g.number_of_nodes()
-    print len(list(partition))
+    print(dfa.g.number_of_nodes())
+    print(len(list(partition)))
     # convert partition to DFA
     nx.condensation
 

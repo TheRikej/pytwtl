@@ -38,7 +38,7 @@ def test_accept_prop_boolean(verbose=False, show=False):
     for kwargs in [{'boolean':True}, {'boolean':False}, {'prop':'A'}]:
         dfa = accept_prop(props, **kwargs)
         if verbose:
-            print dfa
+            print(dfa)
         if show:
             dfa.visualize(draw='matplotlib')
             plt.show()
@@ -57,17 +57,17 @@ def test_intersection_union(verbose=False, show=False):
     
     for operation in [union]: #intersection, union]:
         if verbose:
-            print 'Operation:', operation.__name__
+            print('Operation:', operation.__name__)
         
         dfa = operation(dfa1, dfa2)
         if verbose:
             for fsa in [dfa1, dfa2, dfa]:
-                print fsa
-                print fsa.tree
-                print fsa.counters
-                print
-                for u, v, d in fsa.g.edges_iter(data=True):
-                    print (u, v), d
+                print(fsa)
+                print(fsa.tree)
+                # print(fsa.counters)
+                print()
+                for u, v, d in fsa.g.edges(data=True):
+                    print((u, v), d)
         if show:
             dfa1.visualize(draw='matplotlib')
             plt.show()
@@ -87,12 +87,12 @@ def test_concatenation(verbose=False, show=False):
     
     dfa = concatenation(dfa1, dfa2)
     if verbose:
-        print dfa
-        print dfa.tree
-        print dfa.counters
-        print
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print(dfa)
+        print(dfa.tree)
+        # print(dfa.counters)
+        print()
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     if show:
         dfa1.visualize(draw='matplotlib')
         plt.show()
@@ -108,7 +108,7 @@ def test_hold(verbose=False, show=False):
                    {'prop':'B', 'duration':2, 'negation':True}]:
         dfa = hold(props, **kwargs)
         if verbose:
-            print dfa
+            print(dfa)
         if show:
             dfa.visualize(draw='matplotlib')
             plt.show()
@@ -121,9 +121,9 @@ def test_repeat(verbose=False, show=False):
     dfa = hold(props, prop='A', duration=2, negation=False)
     dfa = repeat(dfa, low=2, high=4)
     if verbose:
-        print dfa
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print(dfa)
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     if show:
         dfa.visualize()
         plt.show()
@@ -132,9 +132,9 @@ def test_repeat(verbose=False, show=False):
     dfa = hold(props, prop='A', duration=2, negation=False)
     dfa = repeat(dfa, low=0, high=4)
     if verbose:
-        print dfa
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print(dfa)
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     if show:
         dfa.visualize()
         plt.show()
@@ -144,9 +144,9 @@ def test_repeat(verbose=False, show=False):
     dfa.add_trap_state()
     dfa = repeat(dfa, low=0, high=4)
     if verbose:
-        print dfa
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print(dfa)
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     if show:
         dfa.visualize()
         plt.show()
@@ -157,19 +157,19 @@ def test_repeat(verbose=False, show=False):
     dfa = union(dfa1, dfa2)
     
     if verbose:
-        print '[test_within] Preprocessing:'
-        print dfa1
-        print dfa2
-        print 'Union'
-        print dfa
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print('[test_within] Preprocessing:')
+        print(dfa1)
+        print(dfa2)
+        print('Union')
+        print(dfa)
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     
     dfa = repeat(dfa, low=0, high=4)
     if verbose:
-        print dfa
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print(dfa)
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     if show:
         dfa.visualize()
         plt.show()
@@ -182,12 +182,12 @@ def test_eventually(verbose=False, show=False):
     dfa = hold(props, prop='A', duration=2, negation=False)
     dfa = eventually(dfa, low=2, high=5)
     if verbose:
-        print dfa
-        print dfa.tree
-        print dfa.counters
-        print
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print(dfa)
+        print(dfa.tree)
+        # print(dfa.counters)
+        print()
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     if show:
         dfa.visualize(draw='matplotlib')
         plt.show()
@@ -196,12 +196,12 @@ def test_eventually(verbose=False, show=False):
     dfa = hold(props, prop='A', duration=2, negation=False)
     dfa = eventually(dfa, low=0, high=5)
     if verbose:
-        print dfa
-        print dfa.tree
-        print dfa.counters
-        print
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print(dfa)
+        print(dfa.tree)
+        # print(dfa.counters)
+        print()
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     if show:
         dfa.visualize(draw='matplotlib')
         plt.show()
@@ -211,12 +211,12 @@ def test_eventually(verbose=False, show=False):
     dfa.add_trap_state()
     dfa = eventually(dfa, low=0, high=5)
     if verbose:
-        print dfa
-        print dfa.tree
-        print dfa.counters
-        print
-        for u, v, d in dfa.g.edges_iter(data=True):
-            print (u, v), d
+        print(dfa)
+        print(dfa.tree)
+        # print(dfa.counters)
+        print()
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
     if show:
         dfa.visualize(draw='matplotlib')
         plt.show()

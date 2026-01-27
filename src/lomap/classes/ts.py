@@ -17,7 +17,7 @@
 import networkx as nx
 import re
 import itertools
-from model import Model
+from lomap.classes.model import Model
 
 class FileError(Exception):
 	pass
@@ -40,7 +40,7 @@ class Ts(Model):
 				lines = f.read().splitlines()
 		except:
 			raise FileError('Problem opening file %s for reading.' % path)
-		line_cnt = 0;
+		line_cnt = 0
 		
 		##
 		# Part-1: Model attributes
@@ -82,11 +82,11 @@ class Ts(Model):
 
 		# We store state attributes in a dict keyed by states as
 		# we haven't defined them yet
-		state_attr = dict();
+		state_attr = dict()
 		try:
 			while(line_cnt < len(lines) and lines[line_cnt] != ';'):
-				m = re.search('(\S*) (.*)$', lines[line_cnt]);
-				exec("state_attr['%s'] = %s" % (m.group(1),m.group(2)));
+				m = re.search('(\S*) (.*)$', lines[line_cnt])
+				exec("state_attr['%s'] = %s" % (m.group(1),m.group(2))) #TODO
 				line_cnt += 1
 			line_cnt+=1
 		except:
@@ -119,7 +119,7 @@ class Ts(Model):
 		Returns controls corresponding to a run.
 		If there are multiple controls for an edge, returns the first one.
 		"""
-		controls = [];
+		controls = []
 		for s, t in zip(run[0:-1], run[1:]):
 			# The the third zero index for choosing the first parallel
 			# edge in the multidigraph
@@ -151,7 +151,7 @@ class Ts(Model):
 		else:
 			# q is a normal state of the transition system
 			r = []
-			for source, target, data in self.g.out_edges_iter((q,), data=True):
+			for source, target, data in self.g.out_edges((q,), data=True):
 				r.append((target, data['weight'], data.get('control', None)))
 			return tuple(r)
 

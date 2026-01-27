@@ -27,7 +27,7 @@ license_text='''
 
 import logging
 from dfa import Op
-from StringIO import StringIO
+from io import StringIO
 
 def _debug_pprint_tree(tree, level=0, indent=2):
     '''Returns a multi-line string representation of the whole tree.'''
@@ -106,10 +106,10 @@ def _debug_no_repeated_finals_check(pa, tree, M):
     exactly once.
     '''
     if logging.getLogger().isEnabledFor(logging.DEBUG):
-        finish = set([p for p in pa.g.nodes_iter() if p[1] in tree.final])
+        finish = set([p for p in pa.g.nodes() if p[1] in tree.final])
         assert all([p.path[-1] in finish for p in M])
         for p in M:
-            print 'assert:', finish, p
+            print('assert:', finish, p)
             assert not (finish & set(p.path[:-1]))
         assert all([p.path[-1][1] in tree.final for p in M])
 

@@ -684,7 +684,7 @@ def construct_field_event_ts(agents, rhos, ts_tuple, tts, run, wait_sets, suffix
 				prev_state = next_state
 
 	# Tie the remaining states to the start of the suffix
-	for state in field_ts.g.nodes_iter():
+	for state in field_ts.g.nodes():
 		if not field_ts.g[state]:
 			logger.debug('%s left alone', state)
 			suffix_start_state = tuple([suffix_start for ii in agents])
