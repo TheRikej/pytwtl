@@ -230,7 +230,7 @@ Edges: {edges}
 			next_states = dict()
 			for cur_state in cur_state_set:
 				for _,next_state,data in self.g.out_edges(cur_state, True):
-					inp = iter(data['input']).next()
+					inp = iter(data['input']).__next__()
 					if inp not in next_states:
 						next_states[inp] = set()
 					next_states[inp].add(next_state)
@@ -250,7 +250,7 @@ Edges: {edges}
 			ins = set()
 			for u,v,d in det.g.out_edges(state,True):
 				assert len(d['input']) == 1
-				inp = iter(d['input']).next()
+				inp = iter(d['input']).__next__()
 				if inp in ins:
 					assert False
 				ins.add(inp)

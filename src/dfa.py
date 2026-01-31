@@ -52,7 +52,25 @@ Assumptions: The following code assumes that the given TWTL formula:
 
 class DFAType(object):
     '''Class defining the two DFA types, normal DFA and infinity DFA.'''
-    Normal, Infinity = range(2)
+    Normal, Infinity, Both = range(3)
+    def __init__(self, type: int|str):
+        if type in (self.Normal, 'Normal', 'normal'):
+            self.type = self.Normal
+        elif type in (self.Infinity, 'Infinity', 'infinity'):
+            self.type = self.Infinity
+        elif type in (self.Both, 'Both', 'both'):
+            self.type = self.Both
+        else:
+            raise ValueError('Unknown DFA type!')
+    
+    def is_normal(self) -> bool:
+        return self.type in (self.Normal, self.Both)
+    
+    def is_infinity(self) -> bool:
+        return self.type in (self.Infinity, self.Both)
+    
+
+        
 '''The DFA type to generate.'''
 dfa_type = DFAType.Infinity
 
@@ -217,7 +235,7 @@ class DFATreeNode(object):
                 format(Op.str(self.operation), self.wdf, self.wwf, self.unr)
 
 
-def copy_tree(dfa_src, dfa_dest, mapping=None):
+def copy_tree(dfa_src: Fsa, dfa_dest: Fsa, mapping:dict|None=None):
     '''Copies the tree from the source to the destination automaton and
     translates the tree data using the mapping dictionary.
     '''
@@ -226,7 +244,7 @@ def copy_tree(dfa_src, dfa_dest, mapping=None):
         if mapping is not None:
             dfa_dest.tree.relabel(mapping)
 
-def init_tree(dfa, operation=Op.nop):
+def init_tree(dfa: Fsa, operation=Op.nop):
     '''Creates a new AST tree node and adds it to the automaton `dfa`. The 
     operation corresponding to the tree node is given by the `operation`
     parameter (default=`Op.nop`).
@@ -235,7 +253,7 @@ def init_tree(dfa, operation=Op.nop):
         assert operation in Op.operations
         dfa.tree = DFATreeNode(operation, init=dfa.init.keys(), final=dfa.final)
 
-def mark_eventually(dfa_src, dfa_dest, low, high):
+def mark_eventually(dfa_src: Fsa, dfa_dest: Fsa, low: int, high: int):
     '''Creates a new AST tree node corresponding to a within operator and adds
     it to the destination automaton `dfa_dest`. The child subtree is copied from
     the source automaton `dfa_src`.
@@ -251,7 +269,7 @@ def mark_eventually(dfa_src, dfa_dest, low, high):
     dfa_dest.tree.unr = False
     dfa_dest.tree.ndj = dfa_src.tree.ndj
 
-def mark_concatenation(dfa_src1, dfa_src2, dfa_dest):
+def mark_concatenation(dfa_src1: Fsa, dfa_src2: Fsa, dfa_dest: Fsa):
     '''Creates a new AST tree node corresponding to a concatenation operator and
     adds it to the destination automaton `dfa_dest`. The children subtrees are
     copied from the source automata `dfa_src1` and `dfa_src2`.
@@ -265,7 +283,7 @@ def mark_concatenation(dfa_src1, dfa_src2, dfa_dest):
     dfa_dest.tree.unr = dfa_src1.tree.unr and dfa_src2.tree.unr
     dfa_dest.tree.ndj = dfa_src1.tree.ndj + dfa_src2.tree.ndj
 
-def mark_product(dfa_src1, dfa_src2, dfa_dest, operation, choices=None):
+def mark_product(dfa_src1: Fsa, dfa_src2: Fsa, dfa_dest: Fsa, operation:int, choices:Choice|None=None):
     '''Creates a new AST tree node corresponding to a disjunction or conjunction
     operator and adds it to the destination automaton `dfa_dest`. The children
     subtrees are copied from the source automata `dfa_src1` and `dfa_src2`.
@@ -301,7 +319,7 @@ def mark_product(dfa_src1, dfa_src2, dfa_dest, operation, choices=None):
                         + (operation == Op.union)
 
 
-def relabel_dfa(dfa, mapping=None, start=0, copy=False):
+def relabel_dfa(dfa: Fsa, mapping:dict|None=None, start=0, copy=False):
     '''Relabels the DFA. The new labels are given by the mapping dictionary. By
     default, it relabels the states with integers with the lowest one given by
     start. The dictionary can be a partial mapping of the nodes. The states
@@ -330,7 +348,7 @@ def relabel_dfa(dfa, mapping=None, start=0, copy=False):
 
 
 
-def minimize_dfa(dfa):
+def minimize_dfa(dfa: Fsa) -> Fsa:
     '''for now it does nothing :)
     # FUTURE: implement FSA minimization w/ lomap
     # FUTURE: implement DFCA minimization w/ lomap
@@ -340,7 +358,7 @@ def minimize_dfa(dfa):
 
 
 
-def accept_prop(props, prop=None, boolean=None):
+def accept_prop(props: list[str], prop:str|None=None, boolean:bool|None=None):
     '''Creates a DFA which accepts:
     1) all symbols which contain proposition prop, if prop is not None;
     2) all symbols, if boolean is True;
@@ -363,7 +381,7 @@ def accept_prop(props, prop=None, boolean=None):
     dfa.name = name
     bitmaps = dfa.get_guard_bitmap(guard)
     ngen = it.count()
-    u, v = ngen.next(), ngen.next()
+    u, v = ngen.__next__(), ngen.__next__()
     dfa.g.add_edge(u, v, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
     dfa.init[u] = 1
     dfa.final.add(v)
@@ -371,7 +389,7 @@ def accept_prop(props, prop=None, boolean=None):
     init_tree(dfa, operation=Op.accept)
     return dfa
 
-def hold(props, prop, duration, negation=False):
+def hold(props: list[str], prop: str, duration: int, negation:bool=False):
     '''Creates a DFA which accepts a sequence of symbols all containing
     proposition prop. The length of the sequence is duration+1 corresponding to
     duration time intervals. If negation is True, then the symbols must not
@@ -397,7 +415,7 @@ def hold(props, prop, duration, negation=False):
     logger.debug('[hold] Prop: {} Duration: {} Negation: {} Props: {}'.format(prop, duration, negation, props))
     return dfa
 
-def complement(dfa):
+def complement(dfa: Fsa) -> Fsa:
     '''Negation (complementation) is not supported for TWTL formulae in the
     current implementation, since we are using the assumption that automata have
     only one final state. This assumption does not hold under the normal
@@ -407,7 +425,7 @@ def complement(dfa):
     '''
     raise NotImplementedError
 
-def concatenation(dfa1, dfa2):
+def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     '''Creates a DFA which accepts the language of concatenated word accepted by
     dfa1 and dfa2. Is assumes that concatenation is non-ambiguous, i.e. every
     word in the resulting language can be uniquely decomposed into a prefix word
@@ -429,7 +447,7 @@ def concatenation(dfa1, dfa2):
     # state of dfa1 with the initial state of dfa2
     relabel_dfa(dfa1, start=0)
     init2 = dfa2.init.keys()[0]
-    final1 = iter(dfa1.final).next()
+    final1 = iter(dfa1.final).__next__()
     relabel_dfa(dfa2, mapping={init2: final1}, start=dfa1.g.number_of_nodes())
     assert len(set(dfa1.g.nodes()) & set(dfa2.g.nodes())) == 1
     dfa.g.add_edges_from(dfa1.g.edges(data=True))
@@ -451,7 +469,7 @@ def concatenation(dfa1, dfa2):
     logger.debug('[concatenation] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
     return dfa
 
-def intersection(dfa1, dfa2):
+def intersection(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     '''Creates a DFA which accepts the intersection of the languages
     corresponding to the two DFAs. The conjunction operation of TWTL is mapped
     to intersection.
@@ -609,7 +627,7 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     logger.debug('[union] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
     return dfa
 
-def within(phi, low, high):
+def within(phi: Fsa, low: int, high: int) -> Fsa:
     '''Creates either a normal or infinity version DFA corresponding to a within
     operator which encloses the formula corresponding to dfa.
     '''
@@ -622,7 +640,7 @@ def within(phi, low, high):
     else:
         raise ValueError("Within operator deadline is invalid!")
 
-def eventually(phi_dfa: Fsa, low, high):
+def eventually(phi_dfa: Fsa, low: int, high: int) -> Fsa:
     '''Creates a DFA which accepts the infinity version of a within operator
     which encloses the formula corresponding to phi_dfa.
     NOTE: Assumes that phi_dfa contains no ``trap'' states, i.e. states which do
@@ -659,7 +677,7 @@ def eventually(phi_dfa: Fsa, low, high):
     logger.debug('[eventually] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
     return dfa
 
-def repeat(phi_dfa, low, high):
+def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
     '''Creates a DFA which accepts the language associated with a within
     operator which encloses the formula corresponding to phi_dfa.
     '''
@@ -720,7 +738,7 @@ def repeat(phi_dfa, low, high):
         guard = '(1)'
         bitmaps = dfa.get_guard_bitmap(guard)
         ngen = it.count(start=dfa.g.number_of_nodes())
-        nodes = [ngen.next() for _ in range(low)]
+        nodes = [ngen.__next__() for _ in range(low)]
         attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard}
         dfa.g.add_path(nodes, **attr_dict)
         dfa.g.add_edge(nodes[-1], dfa.init.keys()[0], **attr_dict)
@@ -729,7 +747,7 @@ def repeat(phi_dfa, low, high):
     logger.debug('[within] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
     return dfa
 
-def truncate_dfa(dfa, cutoff):
+def truncate_dfa(dfa: Fsa, cutoff: int) -> Fsa:
     '''Returns a dfa which accepts only the words of length at most cutoff from
     the language associated with the given dfa.
     Note: It assumes that the given dfa has a finite language, i.e. it is a DAG.

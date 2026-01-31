@@ -41,7 +41,7 @@ def minimize(dfa):
     partition.refine(dfa.final)
     unrefined = dict([(id(p), p) for p in partition])
     while unrefined:
-        part = unrefined.pop(unrefined.iterkeys().next())
+        part = unrefined.pop(unrefined.iterkeys().__next__())
         for symbol in dfa.alphabet:
             neighbors = set([v for v, _, d in dfa.g.in_edges(part, data=True)
                                 if symbol in d['input']])

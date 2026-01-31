@@ -14,6 +14,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+from functools import reduce
 import networkx as nx
 import re
 import subprocess as sp
@@ -95,7 +96,7 @@ Edges: {edges}
 		# Logic in Computer Science by Huth and Ryan, pg.177
 
 		# Operator priorities (higher number means higher priority)
-		operators = { "I": 0, "|" : 1, "&": 1, "U": 2, "G": 3, "F": 3, "X": 3, "!": 3};
+		operators = { "I": 0, "|" : 1, "&": 1, "U": 2, "G": 3, "F": 3, "X": 3, "!": 3}
 		output = []
 		stack = []
 

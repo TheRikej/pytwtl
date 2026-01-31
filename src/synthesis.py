@@ -38,6 +38,7 @@ import networkx as nx
 from lomap import Ts, Model
 from lomap import ts_times_ts
 from dfa import DFAType, Op
+from lomap.classes.fsa import Fsa
 
 __all__ = ['ts_times_fsa', 'ts_times_ts', 'expand_duration_ts',
     'one_loop_reach_graph', 'policy_output_word', 'simple_control_policy',
@@ -74,7 +75,7 @@ class ControlPath(object):
     def update_hash(self):
         self._hash = hash(self.path)
     
-    def __eq__(self, cpath):
+    def __eq__(self, cpath: 'ControlPath'):
         # using the stored hash value first saves some time when comparing paths
         if self._hash != cpath._hash:
             return False
@@ -220,7 +221,7 @@ def expand_duration_ts(ts):
     ng = it.count()
     for u, v, data in ts.g.edges(data=True):
         # generate intermediate nodes
-        aux_nodes = [u] + [ng.next() for _ in range(data['duration']-1)] + [v]
+        aux_nodes = [u] + [ng.__next__() for _ in range(data['duration']-1)] + [v]
         u_pos = np.array(ts.g.node[u]['position'])
         v_pos = np.array(ts.g.node[v]['position'])
         aux_pos = [{'position' : tuple(u_pos + s * (v_pos - u_pos)), 's': s}
@@ -360,7 +361,7 @@ def partial_control_policies2(pa, dfa, init, finish, constraint=None):
         
     return sat_paths
 
-def relaxed_control_policy(tree, dfa, pa, constraint=None):
+def relaxed_control_policy(tree, dfa: Fsa, pa, constraint=None):
     '''Computes a control policy with minimum maximum temporal relaxation. It
     also returns the value of the optimal relaxation.
     '''
@@ -451,7 +452,7 @@ def compute_control_policy(pa, dfa, kind):
     output_word = policy_output_word(optimal_ts_path, set(dfa.props.keys()))
     return optimal_ts_path, output_word, optimal_tau
 
-def verify(ts, dfa):
+def verify(ts: Ts, dfa: Fsa):
     '''Verifies if all trajectories of a transition system satisfy a temporal
     relaxation of a TWTL formula. The function takes as input the transition
     system and the annotated DFA corresponding to the TWTL formula. A trap state
@@ -463,7 +464,7 @@ def verify(ts, dfa):
     
     dfa_complete = dfa.clone()
     dfa_complete.add_trap_state()
-    dfa_complete.g.remove_edge(iter(dfa_complete.final).next(), 'trap')
+    dfa_complete.g.remove_edge(iter(dfa_complete.final).__next__(), 'trap')
     
     logging.info('Constructing product automaton with infinity DFA!')
     pa = ts_times_fsa(ts, dfa_complete)

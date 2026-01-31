@@ -659,7 +659,7 @@ def construct_field_event_ts(agents, rhos, ts_tuple, tts, run, wait_sets, suffix
 	valid_sequences = valid_event_seqs(agents, timeline, wait_sets, field_ts)
 
 	# First event we get is the initial state of field_ts
-	_,event_seq = valid_sequences.next()
+	_,event_seq = valid_sequences.__next__()
 	assert(len(event_seq) == 1 and len(event_seq[0]) == len(agents))
 	init_state = tuple([ee.pos for ee in event_seq[0]])
 	assert init_state == tuple([0 for ii in agents])

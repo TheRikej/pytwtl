@@ -62,7 +62,7 @@ class Model(object):
 		Visualizes a LOMAP system model
 		"""
 		if draw == 'pygraphviz':
-			nx.view_pygraphviz(self.g, edgelabel)
+			nx.view_pygraphviz(self.g, edgelabel) #might need to install pygraphviz
 		elif draw == 'matplotlib':
 			pos = nx.spring_layout(self.g)
 			nx.draw(self.g, pos=pos)

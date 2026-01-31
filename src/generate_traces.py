@@ -46,7 +46,7 @@ def generate(formula, traces_file, no_traces=100):
     for k in range(no_traces):
         print('k:', k)
         
-        state = iter(dfa.init).next()
+        state = iter(dfa.init).__next__()
         w = []
         while True:
             r = np.random.randint(0, len(alphabet))

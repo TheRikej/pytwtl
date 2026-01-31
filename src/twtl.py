@@ -229,7 +229,7 @@ def norm(formula):
     boundEvaluator.eval()
     return boundEvaluator.getBound()
 
-def translate(formula, kind='both', norm=False, optimize=True):
+def translate(formula: str, kind:int|str='both', norm=False, optimize=True):
     '''Converts a TWTL formula into an FSA. It can returns both a normal FSA or
     the automaton corresponding to the relaxed infinity version of the
     specification.
@@ -247,13 +247,7 @@ def translate(formula, kind='both', norm=False, optimize=True):
     while computing temporal relaxations is performed using an unoptimized
     automaton.
     '''
-    if kind == 'both':
-        kind = [DFAType.Normal, DFAType.Infinity]
-    elif kind in [DFAType.Normal, DFAType.Infinity]:
-        kind = [kind]
-    else:
-        raise ValueError('DFA type must be either DFAType.Normal, ' +
-                         'DFAType.Infinity or "both"! {} was given!'.format(kind))
+    dfa_type = DFAType(kind)
     
     lexer = twtlLexer(ANTLRStringStream(formula))
     lexer.setAlphabet(set())
@@ -267,7 +261,7 @@ def translate(formula, kind='both', norm=False, optimize=True):
     alphabet = lexer.getAlphabet()
     result= [alphabet]
     
-    if DFAType.Normal in kind:
+    if dfa_type.is_normal():
         setDFAType(DFAType.Normal)
         nodes = CommonTreeNodeStream(t)
         nodes.setTokenStream(tokens)
@@ -278,7 +272,7 @@ def translate(formula, kind='both', norm=False, optimize=True):
         dfa.kind = DFAType.Normal
         result.append(dfa)
     
-    if DFAType.Infinity in kind:
+    if dfa_type.is_infinity():
         setDFAType(DFAType.Infinity)
         setOptimizationFlag(optimize)
         nodes = CommonTreeNodeStream(t)
