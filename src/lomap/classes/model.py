@@ -65,8 +65,16 @@ class Model(object):
 			nx.view_pygraphviz(self.g, edgelabel) #might need to install pygraphviz
 		elif draw == 'matplotlib':
 			pos = nx.spring_layout(self.g)
-			nx.draw(self.g, pos=pos)
+			node_colors = ['red' if node in self.final else ('green' if node in self.init else 'blue') for node in self.g.nodes()]
+			nx.draw(self.g, pos=pos, node_color=node_colors)
 			nx.draw_networkx_labels(self.g, pos=pos)
+			edge_labels = nx.get_edge_attributes(self.g, 'label')
+			
+			# Handle overlapping edge labels for bidirectional edges
+			edge_labels = {(u, v): f"{edge_labels[(v, u)]}/{data}" if self.g.has_edge(v, u) and v != u else data
+							for (u, v, data) in self.g.edges(data='label')}
+			
+			nx.draw_networkx_edge_labels(self.g, pos=pos, edge_labels=edge_labels)
 		else:
 			raise ValueError('Expected parameter draw to be either:'
 							 + '"pygraphviz" or "matplotlib"!')
