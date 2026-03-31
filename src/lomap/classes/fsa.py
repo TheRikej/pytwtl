@@ -15,6 +15,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from functools import reduce
+import copy
 import networkx as nx
 import re
 import subprocess as sp
@@ -75,6 +76,10 @@ Edges: {edges}
 		ret.name = str(self.name)
 		ret.init = dict(self.init)
 		ret.final = set(self.final)
+		if hasattr(self, 'tree'):
+			ret.tree = copy.deepcopy(self.tree)
+		if hasattr(self, 'kind'):
+			ret.kind = self.kind
 		return ret
 
 	@staticmethod
@@ -163,6 +168,8 @@ Edges: {edges}
 		return formula
 
 	def fsa_from_cosafe_formula(self, formula, load=False):
+		if not scheck_binary:
+			raise RuntimeError('scheck binary is not available. Install or bundle LOMAP binaries to use fsa_from_cosafe_formula().')
 
 		# scheck expects a prefix co-safe ltl formula w/ props: p0, p1, ...
 

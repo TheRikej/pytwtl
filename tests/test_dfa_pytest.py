@@ -63,6 +63,19 @@ def _accepts(dfa, word):
     return state in dfa.final
 
 
+def _build_redundant_final_sink_dfa():
+    dfa = Fsa(['A'], directed=True, multi=False)
+    # states: 0(init), 1(final sink), 2(final sink, equivalent to 1), 99(unreachable)
+    dfa.init = {0: 1}
+    dfa.final = {1, 2}
+    dfa.g.add_edge(0, 1, **{'weight': 0, 'input': {1}, 'guard': 'A', 'label': 'A'})
+    dfa.g.add_edge(0, 2, **{'weight': 0, 'input': {0}, 'guard': '!A', 'label': '!A'})
+    dfa.g.add_edge(1, 1, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
+    dfa.g.add_edge(2, 2, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
+    dfa.g.add_edge(99, 99, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
+    return dfa
+
+
 def test_dfatype_constructor_and_predicates():
     assert DFAType('normal').is_normal()
     assert not DFAType('normal').is_infinity()
@@ -140,14 +153,16 @@ def test_dfatree_relabel_non_expand_and_expand_union():
     assert set(tree.choices) == {10}
 
     tree2 = DFATreeNode(Op.union, init={1}, final={2}, choices={1: Choice(left={4})})
-    with pytest.raises(AttributeError):
-        tree2.relabel({1: [('a', 'x'), ('a', 'y')], 2: [('b', 'z')]}, expand=True)
+    tree2.relabel({1: [('a', 'x'), ('a', 'y')], 2: [('b', 'z')]}, expand=True)
+    assert ('a', 'x') in tree2.init and ('a', 'y') in tree2.init
+    assert ('b', 'z') in tree2.final
 
 
-def test_dfatree_pprint_currently_raises_type_error_under_py3():
+def test_dfatree_pprint_returns_string_under_py3():
     tree = DFATreeNode(Op.hold, init={1}, final={2})
-    with pytest.raises(TypeError):
-        tree.pprint()
+    out = tree.pprint()
+    assert isinstance(out, str)
+    assert 'Op:' in out
 
 
 def test_copy_tree_infinity_with_mapping_relabels_tree():
@@ -159,6 +174,17 @@ def test_copy_tree_infinity_with_mapping_relabels_tree():
     copy_tree(src, dest, mapping={0: 100, 1: 200})
     assert dest.tree.init == {100}
     assert dest.tree.final == {200}
+
+
+def test_clone_preserves_tree_annotation_and_kind():
+    setDFAType(DFAType.Infinity)
+    src = hold(PROPS, 'A', duration=0)
+    src.kind = DFAType.Infinity
+    cloned = src.clone()
+    assert hasattr(cloned, 'tree')
+    assert cloned.tree.operation == src.tree.operation
+    assert hasattr(cloned, 'kind')
+    assert cloned.kind == src.kind
 
 
 def test_copy_tree_normal_mode_does_not_copy_tree():
@@ -232,16 +258,53 @@ def test_relabel_dfa_copy_and_inplace_modes():
     assert min(dfa.g.nodes()) >= 100
 
 
-def test_relabel_dfa_copy_then_inplace_in_infinity_mode_exposes_tree_aliasing_bug():
+def test_relabel_dfa_copy_then_inplace_in_infinity_mode_keeps_original_tree_valid():
     setDFAType(DFAType.Infinity)
     dfa = hold(PROPS, 'A', duration=1)
     relabel_dfa(dfa, mapping={0: 10}, start=20, copy=True)
-    with pytest.raises(KeyError):
-        relabel_dfa(dfa, start=100, copy=False)
+    relabel_dfa(dfa, start=100, copy=False)
+    assert min(dfa.g.nodes()) >= 100
 
 
-def test_minimize_dfa_currently_identity():
-    dfa = hold(PROPS, 'A', duration=0)
+def test_minimize_dfa_merges_equivalent_states_and_removes_unreachable():
+    dfa = _build_redundant_final_sink_dfa()
+    minimized = minimize_dfa(dfa)
+    assert isinstance(minimized, Fsa)
+    assert minimized is not dfa
+    assert minimized.g.number_of_nodes() == 2
+    assert len(minimized.init) == 1
+    assert len(minimized.final) == 1
+
+
+def test_minimize_dfa_preserves_language_on_representative_words():
+    dfa = _build_redundant_final_sink_dfa()
+    minimized = minimize_dfa(dfa)
+    words = [
+        [set()],
+        [{'A'}],
+        [set(), {'A'}],
+        [{'A'}, set(), {'A'}],
+    ]
+    for w in words:
+        assert _accepts(dfa, w) == _accepts(minimized, w)
+
+
+def test_minimize_dfa_keeps_non_equivalent_chain_structure_for_hold():
+    dfa = hold(PROPS, 'A', duration=3)
+    minimized = minimize_dfa(dfa)
+    assert minimized.g.number_of_nodes() == dfa.g.number_of_nodes()
+    assert minimized.g.number_of_edges() == dfa.g.number_of_edges()
+
+
+def test_minimize_dfa_returns_original_for_nondeterministic_symbol_overlap():
+    dfa = Fsa(['A'], directed=True, multi=False)
+    dfa.init = {0: 1}
+    dfa.final = {1}
+    # Nondeterministic on symbol 1: two outgoing destinations from state 0.
+    dfa.g.add_edge(0, 1, **{'weight': 0, 'input': {1}, 'guard': 'A', 'label': 'A'})
+    dfa.g.add_edge(0, 2, **{'weight': 0, 'input': {1}, 'guard': 'A', 'label': 'A'})
+    dfa.g.add_edge(1, 1, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
+    dfa.g.add_edge(2, 2, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
     same = minimize_dfa(dfa)
     assert same is dfa
 
@@ -271,17 +334,19 @@ def test_hold_with_and_without_negation():
 def test_complement_flips_final_set_against_graph_nodes():
     dfa = hold(PROPS, 'A', duration=1)
     before = set(dfa.final)
-    all_nodes = set(dfa.g.nodes())
 
     complement(dfa)
-    assert dfa.final == (all_nodes - before)
+    all_nodes_after = set(dfa.g.nodes())
+    assert dfa.final == (all_nodes_after - before)
 
 
-def test_concatenation_currently_raises_due_to_legacy_dict_keys_indexing():
+def test_concatenation_builds_dfa():
     dfa1 = hold(PROPS, 'A', duration=0)
     dfa2 = hold(PROPS, 'B', duration=0)
-    with pytest.raises(TypeError):
-        concatenation(dfa1, dfa2)
+    out = concatenation(dfa1, dfa2)
+    assert isinstance(out, Fsa)
+    assert len(out.init) == 1
+    assert len(out.final) == 1
 
 
 def test_intersection_builds_dfa_in_both_modes():
@@ -294,12 +359,7 @@ def test_intersection_builds_dfa_in_both_modes():
     assert len(normal.final) == 1
 
     setDFAType(DFAType.Infinity)
-    # In Infinity mode, clone() drops tree metadata used by mark_product().
-    with pytest.raises(AttributeError):
-        intersection(dfa1.clone(), dfa2.clone())
-
-    # Success path with non-cloned DFAs that still carry tree annotations.
-    inf = intersection(dfa1, dfa2)
+    inf = intersection(dfa1.clone(), dfa2.clone())
     assert len(inf.init) == 1
     assert len(inf.final) == 1
     assert inf.tree.operation == Op.intersection
@@ -315,10 +375,7 @@ def test_union_builds_dfa_in_both_modes():
     assert len(normal.final) == 1
 
     setDFAType(DFAType.Infinity)
-    with pytest.raises(AttributeError):
-        union(dfa1.clone(), dfa2.clone())
-
-    inf = union(dfa1, dfa2)
+    inf = union(dfa1.clone(), dfa2.clone())
     assert len(inf.init) == 1
     assert len(inf.final) == 1
     assert inf.tree.operation == Op.union
@@ -333,11 +390,13 @@ def test_within_dispatch_infinity_to_eventually_tree():
     assert dfa.tree.high == 3
 
 
-def test_within_normal_currently_fails_due_to_repeat_legacy_indexing():
+def test_within_normal_dispatches_to_repeat():
     setDFAType(DFAType.Normal)
     phi = hold(PROPS, 'A', duration=0)
-    with pytest.raises(TypeError):
-        within(phi, low=0, high=2)
+    dfa = within(phi, low=0, high=2)
+    assert isinstance(dfa, Fsa)
+    assert len(dfa.init) == 1
+    assert len(dfa.final) == 1
 
 
 def test_eventually_adds_prefix_states_for_low_and_else_transitions():
@@ -347,22 +406,28 @@ def test_eventually_adds_prefix_states_for_low_and_else_transitions():
     assert dfa.g.number_of_nodes() >= phi.g.number_of_nodes() + 2
 
 
-def test_repeat_low_zero_currently_fails_due_to_legacy_indexing():
+def test_repeat_low_zero_builds_dfa():
     phi = hold(PROPS, 'A', duration=0)
-    with pytest.raises(TypeError):
-        repeat(phi, low=0, high=2)
+    dfa = repeat(phi, low=0, high=2)
+    assert isinstance(dfa, Fsa)
+    assert len(dfa.init) == 1
+    assert len(dfa.final) == 1
 
 
-def test_repeat_low_positive_currently_fails_due_to_legacy_indexing_before_add_path():
+def test_repeat_low_positive_builds_dfa():
     phi = hold(PROPS, 'A', duration=0)
-    with pytest.raises(TypeError):
-        repeat(phi, low=1, high=3)
+    dfa = repeat(phi, low=1, high=3)
+    assert isinstance(dfa, Fsa)
+    assert len(dfa.init) == 1
+    assert len(dfa.final) == 1
 
 
-def test_truncate_dfa_currently_fails_due_to_legacy_dict_keys_indexing():
+def test_truncate_dfa_reduces_reachable_edges():
     dfa = hold(PROPS, 'A', duration=2)
-    with pytest.raises(TypeError):
-        truncate_dfa(dfa, cutoff=1)
+    before = dfa.g.number_of_edges()
+    out = truncate_dfa(dfa, cutoff=1)
+    assert isinstance(out, Fsa)
+    assert out.g.number_of_edges() <= before
 
 
 def test_public_combinators_return_fsa_instances_where_successful():
@@ -396,8 +461,8 @@ def test_union_merges_multiple_final_states_to_one():
     # Distinct formulas increase the chance of >1 finals before merge.
     dfa1 = hold(PROPS, 'A', duration=1)
     dfa2 = hold(PROPS, 'B', duration=1)
-    with pytest.raises(KeyError):
-        union(dfa1, dfa2)
+    dfa = union(dfa1, dfa2)
+    assert len(dfa.final) == 1
 
 
 def test_relabel_dfa_preserves_init_and_final_cardinality():
@@ -474,6 +539,30 @@ def test_union_language_accepts_either_branch_single_step():
     assert _accepts(dfa, [{'B'}]) is True
     assert _accepts(dfa, [{'A', 'B'}]) is True
     assert _accepts(dfa, [set()]) is False
+
+
+def test_union_of_complements_matches_not_a_or_not_b():
+    setDFAType(DFAType.Infinity)
+    not_a = complement(hold(PROPS, 'A', duration=0))
+    not_b = complement(hold(PROPS, 'B', duration=0))
+    dfa = union(not_a, not_b)
+
+    assert _accepts(dfa, [set()]) is True
+    assert _accepts(dfa, [{'A'}]) is True
+    assert _accepts(dfa, [{'B'}]) is True
+    assert _accepts(dfa, [{'A', 'B'}]) is False
+
+
+def test_intersection_of_complements_matches_not_a_and_not_b():
+    setDFAType(DFAType.Infinity)
+    not_a = complement(hold(PROPS, 'A', duration=0))
+    not_b = complement(hold(PROPS, 'B', duration=0))
+    dfa = intersection(not_a, not_b)
+
+    assert _accepts(dfa, [set()]) is True
+    assert _accepts(dfa, [{'A'}]) is False
+    assert _accepts(dfa, [{'B'}]) is False
+    assert _accepts(dfa, [{'A', 'B'}]) is False
 
 
 def test_union_choices_metadata_tracks_left_right_and_both_when_available():
@@ -561,7 +650,5 @@ def test_union_and_intersection_output_guards_are_nonempty_strings():
 def test_composed_automata_multiple_operations_remain_deterministic_from_init():
     left = union(hold(PROPS, 'A', duration=0), hold(PROPS, 'B', duration=0))
     right = eventually(hold(PROPS, 'C', duration=0), low=0, high=3)
-    # Current Python 3 behavior fails in DFATreeNode.relabel(expand=True) on
-    # legacy `.iteritems()` call when composing a union tree in product marking.
-    with pytest.raises(AttributeError):
-        intersection(left, right)
+    prod = intersection(left, right)
+    assert len(prod.init) == 1

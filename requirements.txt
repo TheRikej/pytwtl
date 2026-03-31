@@ -1,0 +1,6 @@
+antlr4-python3-runtime>=4.13,<4.14
+antlr4-tools>=0.2.1
+networkx
+numpy
+matplotlib
+pytest

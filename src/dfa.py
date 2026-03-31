@@ -26,6 +26,7 @@ license_text='''
 '''
 
 import logging
+import copy
 
 from transition_rules import *
 logger = logging.getLogger(__name__)
@@ -162,15 +163,17 @@ class DFATreeNode(object):
         while stack:
             tree = stack.pop()
             if expand:
+                init_expanded = list(it.chain.from_iterable([mapping[u] for u in tree.init]))
+                final_expanded = list(it.chain.from_iterable([mapping[u] for u in tree.final]))
                 logging.debug('state: %s \n init: %s\n final: %s',
                               Op.str(tree.operation),
-                              list(*it.chain([mapping[u] for u in tree.init])),
-                              list(*it.chain([mapping[u] for u in tree.final])))
-                tree.init = set(*it.chain([mapping[u] for u in tree.init]))
-                tree.final = set(*it.chain([mapping[u] for u in tree.final]))
+                              init_expanded,
+                              final_expanded)
+                tree.init = set(init_expanded)
+                tree.final = set(final_expanded)
                 if tree.operation == Op.union:
                     tree.choices = dict([(key, v)
-                                            for k, v in tree.choices.iteritems()
+                                            for k, v in tree.choices.items()
                                                 for key in mapping[k]])
             else:
                 tree.init = set([mapping[u] for u in tree.init])
@@ -215,19 +218,19 @@ class DFATreeNode(object):
     def pprint(self, level=0, indent=2):
         '''Returns a multi-line string representation of the whole tree.'''
         ret = StringIO()
-        print>>ret, ' '*(level*indent), str(self)
-        print>>ret, ' '*(level*indent), 'Init:', self.init
-        print>>ret, ' '*(level*indent), 'Final:', self.final
+        print(' '*(level*indent), str(self), file=ret)
+        print(' '*(level*indent), 'Init:', self.init, file=ret)
+        print(' '*(level*indent), 'Final:', self.final, file=ret)
         if self.operation == Op.union:
-            print>>ret, ' '*(level*indent), 'Choices:'
-            for k, v in self.choices.iteritems():
-                print>>ret, ' '*((level+1)*indent), k, '->', v
+            print(' '*(level*indent), 'Choices:', file=ret)
+            for k, v in self.choices.items():
+                print(' '*((level+1)*indent), k, '->', v, file=ret)
         if self.left is not None:
-            print>>ret, ' '*(level*indent), 'Left:'
-            print>>ret, self.left.pprint(level=level+1),
+            print(' '*(level*indent), 'Left:', file=ret)
+            print(self.left.pprint(level=level+1), end='', file=ret)
         if self.right is not None:
-            print>>ret, ' '*(level*indent), 'Right:'
-            print>>ret, self.right.pprint(level=level+1),
+            print(' '*(level*indent), 'Right:', file=ret)
+            print(self.right.pprint(level=level+1), end='', file=ret)
         ret_str = str(ret.getvalue())
         ret.close()
         return ret_str
@@ -241,8 +244,10 @@ def copy_tree(dfa_src: Fsa, dfa_dest: Fsa, mapping:dict|None=None):
     '''Copies the tree from the source to the destination automaton and
     translates the tree data using the mapping dictionary.
     '''
-    if getDFAType() == DFAType.Infinity:
-        dfa_dest.tree = dfa_src.tree
+    # Some DFAs (e.g., manually created FSAs or clones from legacy LOMAP API)
+    # do not carry annotation tree metadata.
+    if getDFAType() == DFAType.Infinity and hasattr(dfa_src, 'tree'):
+        dfa_dest.tree = copy.deepcopy(dfa_src.tree)
         if mapping is not None:
             dfa_dest.tree.relabel(mapping)
 
@@ -290,20 +295,17 @@ def mark_product(dfa_src1: Fsa, dfa_src2: Fsa, dfa_dest: Fsa, operation:int, cho
     operator and adds it to the destination automaton `dfa_dest`. The children
     subtrees are copied from the source automata `dfa_src1` and `dfa_src2`.
     '''
-    final_dest = iter(dfa_dest.final).__next__()
-    final_src1 = iter(dfa_src1.final).__next__()
-    final_src2 = iter(dfa_src2.final).__next__()
     # relabel data in left tree
     mapping = dict([(u, []) for u in dfa_src1.g.nodes()])
     for u, v in dfa_dest.g.nodes():
-        mapping[u].append((u, v))
-    assert final_dest in mapping[final_src1]
+        if u in mapping:
+            mapping[u].append((u, v))
     dfa_src1.tree.relabel(mapping, expand=True)
     # relabel data in right tree
     mapping = dict([(v, []) for v in dfa_src2.g.nodes()])
     for u, v in dfa_dest.g.nodes():
-        mapping[v].append((u, v))
-    assert final_dest in mapping[final_src2]
+        if v in mapping:
+            mapping[v].append((u, v))
     dfa_src2.tree.relabel(mapping, expand=True)
     # create new AST tree
     dfa_dest.tree = DFATreeNode(operation, left=dfa_src1.tree,
@@ -351,12 +353,125 @@ def relabel_dfa(dfa: Fsa, mapping:dict|None=None, start=0, copy=False):
 
 
 def minimize_dfa(dfa: Fsa) -> Fsa:
-    '''for now it does nothing :)
-    # FUTURE: implement FSA minimization w/ lomap
-    # FUTURE: implement DFCA minimization w/ lomap
-    # Korner algorithm or Incremental algorithm by Campeanu, Paun
+    '''Minimizes a deterministic DFA by merging language-equivalent states.
+
+    The implementation uses iterative partition refinement (Moore-style)
+    on reachable states. Missing transitions are interpreted as transitions
+    to an implicit rejecting sink. If overlapping guards induce
+    nondeterminism for some symbol, minimization is skipped and the original
+    automaton is returned unchanged.
     '''
-    return dfa
+    if not dfa.g.nodes() or not dfa.init:
+        return dfa
+
+    # compute reachable states from all initial states
+    reachable = set()
+    for init_state in dfa.init.keys():
+        if init_state in dfa.g:
+            reachable.add(init_state)
+            reachable |= nx.descendants(dfa.g, init_state)
+
+    if not reachable:
+        return dfa
+
+    alphabet = set(dfa.alphabet)
+
+    # deterministic transition function delta[q][symbol] -> q'
+    delta = {q: {} for q in reachable}
+    for q in reachable:
+        for _, v, data in dfa.g.out_edges(q, data=True):
+            if v not in reachable:
+                continue
+            symbols = set(data.get('input', set())) & alphabet
+            for sym in symbols:
+                prev = delta[q].get(sym, None)
+                if prev is not None and prev != v:
+                    logger.warning('[minimize_dfa] Nondeterministic transitions detected at state %s symbol %s. Skipping minimization.', q, sym)
+                    return dfa
+                delta[q][sym] = v
+
+    finals = set(dfa.final) & reachable
+
+    # initialize partition by acceptance status
+    partition = [set(finals), set(reachable - finals)]
+    partition = [p for p in partition if p]
+
+    def state_to_block(parts):
+        block_of = {}
+        for bid, block in enumerate(parts):
+            for s in block:
+                block_of[s] = bid
+        return block_of
+
+    # refine partition until fixed point
+    while True:
+        block_of = state_to_block(partition)
+        new_partition = []
+        for block in partition:
+            signatures = {}
+            for q in block:
+                sig = tuple(block_of.get(delta[q].get(sym, None), -1)
+                            for sym in sorted(alphabet))
+                signatures.setdefault(sig, set()).add(q)
+            new_partition.extend(signatures.values())
+        if len(new_partition) == len(partition):
+            unchanged = True
+            for b_old in partition:
+                if not any(b_old == b_new for b_new in new_partition):
+                    unchanged = False
+                    break
+            if unchanged:
+                partition = new_partition
+                break
+        partition = new_partition
+
+    # build minimized automaton
+    block_of = state_to_block(partition)
+    min_dfa = Fsa(dfa.props, dfa.directed, dfa.multi)
+    min_dfa.name = str(dfa.name)
+    if hasattr(dfa, 'kind'):
+        min_dfa.kind = dfa.kind
+
+    # preserved initial/final sets
+    min_dfa.init = {block_of[s]: 1 for s in dfa.init.keys() if s in block_of}
+    min_dfa.final = {block_of[s] for s in finals}
+
+    # aggregate edge labels by (source_block, target_block)
+    edge_data = {}
+    for q in reachable:
+        bq = block_of[q]
+        for _, v, data in dfa.g.out_edges(q, data=True):
+            if v not in block_of:
+                continue
+            bv = block_of[v]
+            key = (bq, bv)
+            e = edge_data.setdefault(key, {'input': set(), 'guards': []})
+            e['input'] |= (set(data.get('input', set())) & alphabet)
+            guard = data.get('guard', None)
+            if guard is not None:
+                e['guards'].append(str(guard))
+
+    for (u, v), data in edge_data.items():
+        bitmaps = data['input']
+        if not bitmaps:
+            continue
+        guards = data['guards']
+        if not guards:
+            guard = '(min)'
+        else:
+            uniq = []
+            seen = set()
+            for g in guards:
+                if g not in seen:
+                    uniq.append(g)
+                    seen.add(g)
+            guard = uniq[0] if len(uniq) == 1 else ' | '.join(['({})'.format(g) for g in uniq])
+        min_dfa.g.add_edge(u, v, **{'weight': 0, 'input': bitmaps,
+                                    'guard': guard, 'label': guard})
+
+    # normalize labels to contiguous integers
+    relabel_dfa(min_dfa, start=0)
+    return min_dfa
 
 
 
@@ -428,7 +543,9 @@ def complement(dfa: Fsa) -> Fsa:
     special complement operation which preserves this property and is tailored
     for specifications with time-windows.
     '''
-    dfa.final = dfa.g.nodes - dfa.final
+    # Ensure total transition function before complementing.
+    dfa.add_trap_state()
+    dfa.final = set(dfa.g.nodes()) - set(dfa.final)
     return dfa
 
 def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
@@ -452,7 +569,7 @@ def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     # relabel the two DFAs to avoid state name collisions and merge the final
     # state of dfa1 with the initial state of dfa2
     relabel_dfa(dfa1, start=0)
-    init2 = dfa2.init.keys()[0]
+    init2 = next(iter(dfa2.init.keys()))
     final1 = iter(dfa1.final).__next__()
     relabel_dfa(dfa2, mapping={init2: final1}, start=dfa1.g.number_of_nodes())
     assert len(set(dfa1.g.nodes()) & set(dfa2.g.nodes())) == 1
@@ -486,7 +603,42 @@ def intersection(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     assert dfa1.props == dfa2.props
     assert dfa1.alphabet == dfa2.alphabet
     assert len(dfa1.init) == 1 and len(dfa2.init) == 1
-    assert len(dfa1.final) == 1 and len(dfa2.final) == 1
+    assert len(dfa1.final) >= 1 and len(dfa2.final) >= 1
+
+    # Generic boolean-product path for multi-final DFAs (e.g., complements).
+    # The legacy path below is tailored for single-final TWTL constructions.
+    if len(dfa1.final) > 1 or len(dfa2.final) > 1:
+        dfa = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
+        dfa.name = '(Intersection {} {} )'.format(dfa1.name, dfa2.name)
+
+        init = list(it.product(dfa1.init.keys(), dfa2.init.keys()))
+        dfa.init = dict(zip(init, (1,) * len(init)))
+
+        stack = list(init)
+        while stack:
+            u1, u2 = stack.pop()
+            for _, v1, d1 in dfa1.g.edges(u1, data=True):
+                for _, v2, d2 in dfa2.g.edges(u2, data=True):
+                    bitmaps = d1['input'] & d2['input']
+                    if bitmaps:
+                        if (v1, v2) not in dfa.g:
+                            stack.append((v1, v2))
+                        guard = '({}) & ({})'.format(d1['guard'], d2['guard'])
+                        label = AndRule(d1['label'], d2['label'])
+                        dfa.g.add_edge((u1, u2), (v1, v2), **{'weight': 0, 'input': bitmaps, 'guard': guard, 'label': label})
+
+        dfa.final = {(u, v) for u, v in dfa.g.nodes() if u in dfa1.final and v in dfa2.final}
+
+        if getDFAType() == DFAType.Infinity:
+            mark_product(dfa1, dfa2, dfa, Op.intersection)
+        elif getDFAType() == DFAType.Normal:
+            dfa = minimize_dfa(dfa)
+        else:
+            raise ValueError('DFA type must be either DFAType.Normal or ' +
+                             'DFAType.Infinity! {} was given!'.format(getDFAType()))
+
+        relabel_dfa(dfa)
+        return dfa
     
     dfa = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
     dfa.name = '(Intersection {} {} )'.format(dfa1.name, dfa2.name)
@@ -527,7 +679,6 @@ def intersection(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     
     # the set of final states is the product of final sets of dfa1 and dfa2
     dfa.final = set(it.product(dfa1.final, dfa2.final))
-    assert len(dfa.final) == 1
     
     if getDFAType() == DFAType.Infinity:
         mark_product(dfa1, dfa2, dfa, Op.intersection)
@@ -558,6 +709,39 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     
     dfa = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
     dfa.name = '(Union {} {} )'.format(dfa1.name, dfa2.name)
+    choices = {}
+
+    # Generic boolean-product path for multi-final DFAs (e.g., complements).
+    # The legacy path below is tailored for single-final TWTL constructions.
+    if len(dfa1.final) > 1 or len(dfa2.final) > 1:
+        init = list(it.product(dfa1.init.keys(), dfa2.init.keys()))
+        dfa.init = dict(zip(init, (1,) * len(init)))
+
+        stack = list(init)
+        while stack:
+            u1, u2 = stack.pop()
+            for _, v1, d1 in dfa1.g.edges(u1, data=True):
+                for _, v2, d2 in dfa2.g.edges(u2, data=True):
+                    bitmaps = d1['input'] & d2['input']
+                    if bitmaps:
+                        if (v1, v2) not in dfa.g:
+                            stack.append((v1, v2))
+                        guard = '({}) & ({})'.format(d1['guard'], d2['guard'])
+                        label = AndRule(d1['label'], d2['label'])
+                        dfa.g.add_edge((u1, u2), (v1, v2), **{'weight': 0, 'input': bitmaps, 'guard': guard, 'label': label})
+
+        dfa.final = {(u, v) for u, v in dfa.g.nodes() if u in dfa1.final or v in dfa2.final}
+
+        if getDFAType() == DFAType.Infinity:
+            mark_product(dfa1, dfa2, dfa, Op.union, choices)
+        elif getDFAType() == DFAType.Normal:
+            dfa = minimize_dfa(dfa)
+        else:
+            raise ValueError('DFA type must be either DFAType.Normal or ' +
+                             'DFAType.Infinity! {} was given!'.format(getDFAType()))
+
+        relabel_dfa(dfa)
+        return dfa
     
     # add self-loops on final states and trap states
     attr_dict={'weight': 0, 'input': dfa.alphabet, 'guard' : '(1)', 'label': '(1)'}
@@ -597,7 +781,8 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     
     # merge finals
     if len(dfa.final) > 1:
-        final = (iter(dfa1.final).__next__(), iter(dfa2.final).__next__())
+        candidate = (iter(dfa1.final).__next__(), iter(dfa2.final).__next__())
+        final = candidate if candidate in dfa.g else next(iter(dfa.final))
         # satisfies both left and right sub-formulae
         # choices = dict([(u, Choice(both=d['input']))
         #                        for u, _, d in dfa.g.in_edges(final, data=True)])
@@ -661,7 +846,7 @@ def eventually(phi_dfa: Fsa, low: int, high: int) -> Fsa:
     dfa = phi_dfa.clone()
     dfa.name = '(Eventually {} {} {} )'.format(phi_dfa.name, low, high)
     
-    init = dfa.init.keys().__iter__().__next__()
+    init = next(iter(dfa.init.keys()))
     for state in dfa.g.nodes():
         bitmaps = set()
         guard = '(else)'
@@ -698,7 +883,7 @@ def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
     assert len(phi_dfa.init) == 1
     assert len(phi_dfa.final) == 1
     
-    init_state = phi_dfa.init.keys()[0]
+    init_state = next(iter(phi_dfa.init.keys()))
     final_state = set(phi_dfa.final).pop()
     
     # remove trap states if there are any
@@ -722,7 +907,7 @@ def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
         truncate_dfa(dfa_aux, cutoff=(high-low+1)-k)
         # 3. add truncated dfa_aux to dfa
         dfa.g.add_edges_from(dfa_aux.g.edges(data=True))
-        inits.append(dfa_aux.init.keys()[0])
+        inits.append(next(iter(dfa_aux.init.keys())))
         nstates += dfa_aux.g.number_of_nodes()
     # set initial and final state
     dfa.init = {inits[0] : 1}
@@ -756,8 +941,8 @@ def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
         ngen = it.count(start=dfa.g.number_of_nodes())
         nodes = [ngen.__next__() for _ in range(low)]
         attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
-        dfa.g.add_path(nodes, **attr_dict) #possible error - nonexistent method
-        dfa.g.add_edge(nodes[-1], dfa.init.keys()[0], **attr_dict)
+        nx.add_path(dfa.g, nodes, **attr_dict)
+        dfa.g.add_edge(nodes[-1], next(iter(dfa.init.keys())), **attr_dict)
         dfa.init = {nodes[0] : 1}
     
     logger.debug('[within] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
@@ -772,7 +957,7 @@ def truncate_dfa(dfa: Fsa, cutoff: int) -> Fsa:
     NetworkX is available at http://networkx.github.io.
     '''
     assert len(dfa.init) == 1 # deterministic model
-    source = dfa.init.keys()[0]
+    source = next(iter(dfa.init.keys()))
     
     # compute transitions which form path of length at most cutoff in the dfa
     visited = set([source])

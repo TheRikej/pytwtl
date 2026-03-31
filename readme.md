@@ -1,7 +1,7 @@
 <h3>Overview</h3>
 <strong>T</strong>ime <strong>W</strong>indow <strong>T</strong>emporal <strong>L</strong>ogic (TWTL) is a bounded temporal logic used to specify rich properties<a href="#1">[1]</a>. Relaxed versions of TWTL formulae are also considered in the sense of extending the deadlines of time windows. An automata based approach is proposed to solve synthesis, verification and learning problems. The key ingredient is a construction algorithm of annotated Deterministic Finite State Automata (DFA) from TWTL properties. See <a href="#1">[1]</a> for more details. 
 
-This library is a python 3.12 implementation of PyTWTL, which provides an implementation of the algorithms proposed in <a href="#1">[1]</a> based on LOMAP <a href="#2">[2]</a>, ANTLRv3 <a href="#3">[3]</a> and networkx <a href="#4">[4]</a> libraries. PyTWTL implementation is released under the GPLv3 license.
+This library is a python 3.12 implementation of PyTWTL, which provides an implementation of the algorithms proposed in <a href="#1">[1]</a> based on LOMAP <a href="#2">[2]</a>, ANTLRv4 <a href="#3">[3]</a> and networkx <a href="#4">[4]</a> libraries. PyTWTL implementation is released under the GPLv3 license.
 The library can be used to:
 <ul type="square">
     <li>construct DFAs and annotated DFAs from TWTL formulae;</li>
@@ -14,7 +14,7 @@ The library can be used to:
     <li>learn the parameters of a TWTL formula, i.e. the deadlines.</li>
 </ul>
 
-The parsing of TWTL formulae is performed using ANTLRv3 framework. The package provides grammar files which may be used to generate lexers and parsers for other programming languages such as Java, C/C++, Ruby.
+The parsing of TWTL formulae is performed using the ANTLRv4 framework. The package provides grammar files which may be used to generate lexers and parsers for other programming languages such as Java, C/C++, Ruby.
 
 <h3>Citation</h3>
 If you use TWTL or PyTWTL, then please consider citing the reference paper:
@@ -33,14 +33,14 @@ The package is written for python 3.12. The following python packages are requir
     <li>ParallelPython</li>
     <li>matplotlib</li>
     <li>setuptools</li>
-    <li>ANTLRv3 python runtime</li>
+    <li>ANTLRv4 python runtime</li>
 </ul>
 You can install the packages using:
-<code>pip install --user networkx numpy matplotlib pp antlr3-python-runtime setuptools</code>
+<code>pip install --user networkx numpy matplotlib pp antlr4-python3-runtime setuptools</code>
 
 <h3>How to Use</h3>
 See <code>examples_tcs.py</code> for examples of the algorithms and the PyTWTL API.
-An ANT build file <code>build.xml</code> is provided to generate the lexer and parser from the ANTLR3 grammar files.
+An ANT build file <code>build.xml</code> is provided to generate the lexer and parser from the ANTLR4 grammar file.
 
 <h3>License & Copying</h3>
 <pre>Copyright (C) 2015-2016  Cristian Ioan Vasile <cvasile@bu.edu>

@@ -1,9 +1,31 @@
-# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 C:\\Users\\Cristian\\Dropbox\\work\\workspace\\TWTL\\src\\twtl2dfa.g 2016-02-22 17:58:49
+"""Compatibility wrapper for legacy `twtl2dfa` evaluator using ANTLR4 parse trees."""
+
+from antlr4_pipeline import evaluate_dfa
+
+
+class twtl2dfa(object):
+    def __init__(self, nodes):
+        self._nodes = nodes
+        self.props = set()
+        self.dfa = None
+
+    def _tree(self):
+        return getattr(self._nodes, 'tree', self._nodes)
+
+    def eval(self):
+        self.dfa = evaluate_dfa(self._tree(), self.props)
+
+    def getDFA(self):
+        return self.dfa
+
+
+LEGACY_ARCHIVE = r"""
+# historical generated parser archive
 
 import sys
-from antlr3 import *
-from antlr3.tree import *
-from antlr3.compat import set, frozenset
+from antlr4 import *
+from antlr4 import Token
+from antlr4 import ParseTreeVisitor
          
 license_text='''
     Module converts a TWTL formula to an automaton. 
@@ -72,8 +94,8 @@ tokenNames = [
 
 class twtl2dfa(TreeParser):
     grammarFileName = "C:\\Users\\Cristian\\Dropbox\\work\\workspace\\TWTL\\src\\twtl2dfa.g" # TODO: WTF
-    antlr_version = version_str_to_tuple("3.1.3 Mar 18, 2009 10:09:25")
-    antlr_version_str = "3.1.3 Mar 18, 2009 10:09:25"
+    antlr_version = version_str_to_tuple("4.13.2")
+    antlr_version_str = "4.13.2"
     tokenNames = tokenNames
 
     def __init__(self, input, state=None, *args, **kwargs):
@@ -435,7 +457,7 @@ class twtl2dfa(TreeParser):
 
 
 def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
-    from antlr3.main import WalkerMain
+    from antlr4 import CommonTokenStream
     main = WalkerMain(twtl2dfa)
     main.stdin = stdin
     main.stdout = stdout
@@ -445,3 +467,5 @@ def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
 
 if __name__ == '__main__':
     main(sys.argv)
+
+"""

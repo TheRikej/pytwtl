@@ -80,6 +80,8 @@ Edges: {edges}
 		"""
 		Creates a Buchi automaton in-place from the given LTL formula.
 		"""
+		if not ltl2ba_binary:
+			raise RuntimeError('ltl2ba binary is not available. Install or bundle LOMAP binaries to use buchi_from_formula().')
 
 		##
 		# Execute ltl2ba and get output

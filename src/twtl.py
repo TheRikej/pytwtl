@@ -28,15 +28,9 @@ license_text='''
 import logging
 import itertools as it
 
-from antlr3 import ANTLRStringStream, CommonTokenStream
-from antlr3.tree import CommonTreeNodeStream
-
 from lomap.classes.fsa import Fsa
-from twtlLexer import twtlLexer
-from twtlParser import twtlParser
-from bound import bound
-from twtl2dfa import twtl2dfa
 from dfa import setDFAType, DFAType, Op, setOptimizationFlag
+from runtime_monitor import RuntimeMonitor
 from util import _debug_pprint_tree
 
 
@@ -82,6 +76,21 @@ def monitor(formula=None, kind=None, dfa:Fsa|None=None, cutoff=None):
             break
     while True:
         yield -1
+
+
+def monitor_runtime(formula=None, kind=None, dfa:Fsa|None=None):
+    '''Creates a three-valued runtime monitor for a TWTL/UTWTL DFA.
+
+    If a DFA is not provided, the function translates the given formula.
+    By default, infinity DFA is used for runtime monitoring.
+    '''
+    if formula is None and dfa is None:
+        raise Exception('Must provide either a TWTL formula or an automaton!')
+    if dfa is None:
+        if kind is None:
+            kind = DFAType.Infinity
+        _, dfa = translate(formula, kind=kind)
+    return RuntimeMonitor(dfa)
 
 def _init_tree(tree):
     '''Initialized the tree for computing the temporal relaxations.'''
@@ -215,20 +224,10 @@ def norm(formula):
     '''Computes the bounds of the given TWTL formula and returns a 2-tuple
     containing the lower and upper bounds, respectively.
     '''
-    lexer = twtlLexer(ANTLRStringStream(formula))
-    tokens = CommonTokenStream(lexer)
-    parser = twtlParser(tokens)
-    phi = parser.formula()
-    
-    # CommonTree
-    t = phi.tree
-    
-    # compute TWTL bound
-    nodes = CommonTreeNodeStream(t)
-    nodes.setTokenStream(tokens)
-    boundEvaluator = bound(nodes)
-    boundEvaluator.eval()
-    return boundEvaluator.getBound()
+    from antlr4_pipeline import evaluate_norm, parse_formula
+
+    parsed = parse_formula(formula)
+    return evaluate_norm(parsed.tree)
 
 def translate(formula: str, kind:int|str='both', norm=False, optimize=True):
     '''Converts a TWTL formula into an FSA. It can returns both a normal FSA or
@@ -248,49 +247,30 @@ def translate(formula: str, kind:int|str='both', norm=False, optimize=True):
     while computing temporal relaxations is performed using an unoptimized
     automaton.
     '''
+    from antlr4_pipeline import evaluate_dfa, evaluate_norm, parse_formula
+
     dfa_type = DFAType(kind)
     
-    lexer = twtlLexer(ANTLRStringStream(formula))
-    lexer.setAlphabet(set())
-    tokens = CommonTokenStream(lexer)
-    parser = twtlParser(tokens)
-    phi = parser.formula()
-    
-    # CommonTree
-    t = phi.tree
-    
-    alphabet = lexer.getAlphabet()
+    parsed = parse_formula(formula)
+    t = parsed.tree
+    alphabet = parsed.alphabet
     result= [alphabet]
     
     if dfa_type.is_normal():
         setDFAType(DFAType.Normal)
-        nodes = CommonTreeNodeStream(t)
-        nodes.setTokenStream(tokens)
-        translator = twtl2dfa(nodes)
-        translator.props = alphabet
-        translator.eval()
-        dfa = translator.getDFA()
+        dfa = evaluate_dfa(t, alphabet)
         dfa.kind = DFAType.Normal
         result.append(dfa)
     
     if dfa_type.is_infinity():
         setDFAType(DFAType.Infinity)
         setOptimizationFlag(optimize)
-        nodes = CommonTreeNodeStream(t)
-        nodes.setTokenStream(tokens)
-        translator = twtl2dfa(nodes)
-        translator.props = alphabet
-        translator.eval()
-        dfa_inf = translator.getDFA()
+        dfa_inf = evaluate_dfa(t, alphabet)
         dfa_inf.kind = DFAType.Infinity
         result.append(dfa_inf)
     
     if norm: # compute TWTL bound
-        nodes = CommonTreeNodeStream(t)
-        nodes.setTokenStream(tokens)
-        boundEvaluator = bound(nodes)
-        boundEvaluator.eval()
-        result.append(boundEvaluator.getBound())
+        result.append(evaluate_norm(t))
     
     if logging.getLogger().isEnabledFor(logging.DEBUG):
         for mode, name in [(DFAType.Normal, 'Normal'),

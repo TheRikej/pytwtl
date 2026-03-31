@@ -1,8 +1,34 @@
-# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 C:\\Users\\Cristian\\Dropbox\\work\\workspace\\TWTL\\src\\twtl.g 2016-02-22 17:58:48
+"""Compatibility lexer exposing the historical `twtlLexer` API on top of ANTLR4."""
+
+from antlr4 import Token
+
+from antlr4_gen.src.TwtlLexer import TwtlLexer as _TwtlLexer
+
+
+class twtlLexer(_TwtlLexer):
+    def __init__(self, input=None, output=None):
+        super().__init__(input, output)
+        self.alphabet = set()
+
+    def getAlphabet(self):
+        return self.alphabet
+
+    def setAlphabet(self, alphabet):
+        self.alphabet = alphabet
+
+    def nextToken(self):
+        token = super().nextToken()
+        if token.type == self.PROP and token.type != Token.EOF:
+            self.alphabet.add(str(token.text))
+        return token
+
+
+LEGACY_ARCHIVE = r"""
+# historical generated parser archive
 
 import sys
-from antlr3 import *
-from antlr3.compat import set, frozenset
+from antlr4 import *
+from antlr4 import Token
                          
 license_text='''
     Lexer for TWTL formulae. 
@@ -59,8 +85,8 @@ T__21=21
 class twtlLexer(Lexer):
 
     grammarFileName = "C:\\Users\\Cristian\\Dropbox\\work\\workspace\\TWTL\\src\\twtl.g"
-    antlr_version = version_str_to_tuple("3.1.3 Mar 18, 2009 10:09:25")
-    antlr_version_str = "3.1.3 Mar 18, 2009 10:09:25"
+    antlr_version = version_str_to_tuple("4.13.2")
+    antlr_version_str = "4.13.2"
 
     def __init__(self, input=None, state=None):
         if state is None:
@@ -1149,7 +1175,7 @@ class twtlLexer(Lexer):
 
 
 def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
-    from antlr3.main import LexerMain
+    from antlr4 import InputStream
     main = LexerMain(twtlLexer)
     main.stdin = stdin
     main.stdout = stdout
@@ -1159,3 +1185,5 @@ def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
 
 if __name__ == '__main__':
     main(sys.argv)
+
+"""

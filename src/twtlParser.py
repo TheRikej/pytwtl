@@ -1,10 +1,26 @@
-# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 C:\\Users\\Cristian\\Dropbox\\work\\workspace\\TWTL\\src\\twtl.g 2016-02-22 17:58:47
+"""Compatibility parser exposing the historical `twtlParser` API on top of ANTLR4."""
+
+from types import SimpleNamespace
+
+from antlr4_gen.src.TwtlParser import TwtlParser as _TwtlParser
+
+
+class twtlParser(object):
+    def __init__(self, token_stream):
+        self._parser = _TwtlParser(token_stream)
+
+    def formula(self):
+        return SimpleNamespace(tree=self._parser.formula())
+
+
+LEGACY_ARCHIVE = r"""
+# historical generated parser archive
 
 import sys
-from antlr3 import *
-from antlr3.compat import set, frozenset
+from antlr4 import *
+from antlr4 import Token
 
-from antlr3.tree import *
+from antlr4 import ParseTreeVisitor
 
          
 license_text='''
@@ -71,8 +87,8 @@ tokenNames = [
 
 class twtlParser(Parser):
     grammarFileName = "C:\\Users\\Cristian\\Dropbox\\work\\workspace\\TWTL\\src\\twtl.g"
-    antlr_version = version_str_to_tuple("3.1.3 Mar 18, 2009 10:09:25")
-    antlr_version_str = "3.1.3 Mar 18, 2009 10:09:25"
+    antlr_version = version_str_to_tuple("4.13.2")
+    antlr_version_str = "4.13.2"
     tokenNames = tokenNames
 
     def __init__(self, input, state=None, *args, **kwargs):
@@ -993,7 +1009,7 @@ class twtlParser(Parser):
 
 
 def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
-    from antlr3.main import ParserMain
+    from antlr4 import CommonTokenStream
     main = ParserMain("twtlLexer", twtlParser)
     main.stdin = stdin
     main.stdout = stdout
@@ -1003,3 +1019,5 @@ def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
 
 if __name__ == '__main__':
     main(sys.argv)
+
+"""
