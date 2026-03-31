@@ -44,7 +44,34 @@ def test_accept_prop_boolean(verbose=False, show=False):
             plt.show()
 
 def test_complement(verbose=False, show=False):
-    pass
+    props = ['A', 'B', 'C']
+    
+    dfa = hold(props, prop='A', duration=2, negation=False)
+    dfa = eventually(dfa, low=1, high=5)
+    
+    if verbose:
+        print('Original DFA:')
+        print(dfa)
+        print(dfa.tree)
+        # print(dfa.counters)
+        print()
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
+    
+    complement(dfa)
+    
+    if verbose:
+        print('Complemented DFA:')
+        print(dfa)
+        print(dfa.tree)
+        # print(dfa.counters)
+        print()
+        for u, v, d in dfa.g.edges(data=True):
+            print((u, v), d)
+    
+    if show:
+        dfa.visualize(draw='matplotlib')
+        plt.show()
 
 def test_intersection_union(verbose=False, show=False):
     props = ['A', 'B', 'C']
@@ -54,6 +81,7 @@ def test_intersection_union(verbose=False, show=False):
     
     dfa2 = hold(props, prop='B', duration=2, negation=False)
     dfa2 = within(dfa2, low=0, high=4)
+    dfa2 = complement(dfa2)
     
     for operation in [union]: #intersection, union]:
         if verbose:
@@ -73,6 +101,7 @@ def test_intersection_union(verbose=False, show=False):
             plt.show()
             dfa2.visualize(draw='matplotlib')
             plt.show()
+            # complement(dfa)
             dfa.visualize(draw='matplotlib')
             plt.show()
 
@@ -243,3 +272,4 @@ if __name__ == '__main__':
 #     test_repeat(verbose=verbose, show=visualize)
     # test 8: eventually
 #     test_eventually(verbose=verbose, show=visualize)
+    # test 9: 

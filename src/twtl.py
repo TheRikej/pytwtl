@@ -31,6 +31,7 @@ import itertools as it
 from antlr3 import ANTLRStringStream, CommonTokenStream
 from antlr3.tree import CommonTreeNodeStream
 
+from lomap.classes.fsa import Fsa
 from twtlLexer import twtlLexer
 from twtlParser import twtlParser
 from bound import bound
@@ -39,7 +40,7 @@ from dfa import setDFAType, DFAType, Op, setOptimizationFlag
 from util import _debug_pprint_tree
 
 
-def monitor(formula=None, kind=None, dfa=None, cutoff=None):
+def monitor(formula=None, kind=None, dfa:Fsa|None=None, cutoff=None):
     '''Creates a monitor for a TWTL formula.
     It accept the following combinations of parameters:
     1) a formula and its kind;
@@ -71,7 +72,7 @@ def monitor(formula=None, kind=None, dfa=None, cutoff=None):
     state = list(dfa.init.keys())[0] # dfa.init.keys()[0] 
     ret = 0
     for _ in seq:
-        symbol = yield ret
+        symbol = yield ret #weird
         r = dfa.next_states_of_fsa(state, symbol)
         assert len(r) <= 1, 'Should be deterministic!'
         if r:

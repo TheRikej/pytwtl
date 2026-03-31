@@ -577,7 +577,6 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
         u1, u2 = stack.pop()
         for _, v1, d1 in dfa1.g.edges(u1, data=True):
             for _, v2, d2 in dfa2.g.edges(u2, data=True):
-                print(d1, d2)
                 bitmaps = d1['input'] & d2['input']
                 if bitmaps:
                     if (v1, v2) not in dfa.g:

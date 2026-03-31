@@ -351,9 +351,9 @@ Edges: {edges}
 					rem_alphabet -= d['input']
 			if rem_alphabet:
 				if not trap_added: #'trap' not in self.g:
-					self.g.add_edge('trap', 'trap', attr_dict={'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': '(1)'})
+					self.g.add_edge('trap', 'trap', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': '(1)'})
 					trap_added = True
-				self.g.add_edge(s,'trap', attr_dict={'weight': 0, 'input': rem_alphabet, 'guard': 'trap_guard', 'label': 'trap_guard'})
+				self.g.add_edge(s,'trap', **{'weight': 0, 'input': rem_alphabet, 'guard': 'trap_guard', 'label': 'trap_guard'})
 
 		if not trap_added:
 			self.g.remove_node('trap')
