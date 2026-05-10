@@ -22,6 +22,7 @@ import subprocess as sp
 import itertools as it
 import operator as op
 from lomap.classes.model import Model
+from transition_rules import ElseRule, TrueRule
 from . import scheck_binary
 import logging
 
@@ -358,9 +359,9 @@ Edges: {edges}
 					rem_alphabet -= d['input']
 			if rem_alphabet:
 				if not trap_added: #'trap' not in self.g:
-					self.g.add_edge('trap', 'trap', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': '(1)'})
+					self.g.add_edge('trap', 'trap', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': TrueRule()})
 					trap_added = True
-				self.g.add_edge(s,'trap', **{'weight': 0, 'input': rem_alphabet, 'guard': 'trap_guard', 'label': 'trap_guard'})
+				self.g.add_edge(s,'trap', **{'weight': 0, 'input': rem_alphabet, 'guard': 'trap_guard', 'label': ElseRule()})
 
 		if not trap_added:
 			self.g.remove_node('trap')

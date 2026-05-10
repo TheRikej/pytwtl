@@ -28,7 +28,7 @@ license_text='''
 import matplotlib.pyplot as plt
 
 from dfa import accept_prop, complement, concatenation, eventually, hold,\
-                intersection, repeat, union, within
+                intersection, repeat, union, within, minimize_dfa
 from dfa import DFAType, setDFAType
 
 
@@ -250,6 +250,28 @@ def test_eventually(verbose=False, show=False):
         dfa.visualize(draw='matplotlib')
         plt.show()
 
+def test_minimize(verbose=False, show=False):
+    props = ['A']
+    
+    dfa1 = accept_prop(props, prop='A')
+    dfa2 = accept_prop(props, prop='A')
+    dfa = union(dfa1, dfa2)
+    
+    
+    if verbose:
+        print(dfa)
+    if show:
+        dfa.visualize(draw='matplotlib')
+        plt.show()
+    
+    dfa = minimize_dfa(dfa)
+
+    if verbose:
+        print(dfa)
+    if show:
+        dfa.visualize(draw='matplotlib')
+        plt.show()
+
 ################################################################################
 
 if __name__ == '__main__':
@@ -272,4 +294,5 @@ if __name__ == '__main__':
 #     test_repeat(verbose=verbose, show=visualize)
     # test 8: eventually
 #     test_eventually(verbose=verbose, show=visualize)
-    # test 9: 
+    # test 9: minimze
+    # test_minimize(verbose=verbose, show=visualize)

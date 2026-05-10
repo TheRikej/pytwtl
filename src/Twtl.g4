@@ -23,7 +23,7 @@ concatenation
 temporal
     : HOLD CARET INT PROP                          # holdProp
     | HOLD CARET INT NOT PROP                      # holdNegProp
-    | LBRACK formula RBRACK CARET LBRACK INT COMMA INT RBRACK # withinExpr
+    | LBRACK formula RBRACK CARET LBRACK INT (COMMA INT)? RBRACK # withinExpr
     | negation                                     # temporalNegation
     ;
 

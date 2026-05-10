@@ -22,6 +22,7 @@ license_text='''
    :synopsis: Module implements Time-Window Temporal Logic operations.
 
 .. moduleauthor:: Cristian Ioan Vasile <cvasile@bu.edu>
+   
 
 '''
 
@@ -36,21 +37,6 @@ from io import StringIO
 import networkx as nx
 
 from lomap import Fsa
-
-
-'''
-FUTURE:
-1) AST tree rewriting from general form to within-disjunction free (WDF) form.
-2) Minimization of DFAs at each step of the procedure for both DFA versions,
-normal and infinity.
-3) Optimization: disjoint satisfaction of atomic propositions.
-4) Special type of complementation.
-
-Assumptions: The following code assumes that the given TWTL formula:
-1) has no ambiguous concatenation;
-2) negations only in front of atomic propositions;
-3) is in WDF form (will be removed in the future).
-'''
 
 
 class DFAType(object):
@@ -445,11 +431,12 @@ def minimize_dfa(dfa: Fsa) -> Fsa:
                 continue
             bv = block_of[v]
             key = (bq, bv)
-            e = edge_data.setdefault(key, {'input': set(), 'guards': []})
+            e = edge_data.setdefault(key, {'input': set(), 'guards': [], 'labels': []})
             e['input'] |= (set(data.get('input', set())) & alphabet)
             guard = data.get('guard', None)
             if guard is not None:
                 e['guards'].append(str(guard))
+                e['labels'].append(data.get('label'))
 
     for (u, v), data in edge_data.items():
         bitmaps = data['input']
@@ -457,7 +444,8 @@ def minimize_dfa(dfa: Fsa) -> Fsa:
             continue
         guards = data['guards']
         if not guards:
-            guard = '(min)'
+            guard = '(min)'#TODO
+            label = EmptyRule()
         else:
             uniq = []
             seen = set()
@@ -466,8 +454,9 @@ def minimize_dfa(dfa: Fsa) -> Fsa:
                     uniq.append(g)
                     seen.add(g)
             guard = uniq[0] if len(uniq) == 1 else ' | '.join(['({})'.format(g) for g in uniq])
+            label = data['labels'][0] #TODO fix
         min_dfa.g.add_edge(u, v, **{'weight': 0, 'input': bitmaps,
-                                    'guard': guard, 'label': guard})
+                                    'guard': guard, 'label': label})
 
     # normalize labels to contiguous integers
     relabel_dfa(min_dfa, start=0)
@@ -501,7 +490,7 @@ def accept_prop(props: list[str], prop:str|None=None, boolean:bool|None=None):
     bitmaps = dfa.get_guard_bitmap(guard)
     ngen = it.count()
     u, v = ngen.__next__(), ngen.__next__()
-    dfa.g.add_edge(u, v, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
+    dfa.g.add_edge(u, v, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label})
     dfa.init[u] = 1
     dfa.final.add(v)
     
@@ -726,8 +715,8 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
                     if bitmaps:
                         if (v1, v2) not in dfa.g:
                             stack.append((v1, v2))
-                        guard = '({}) & ({})'.format(d1['guard'], d2['guard'])
-                        label = AndRule(d1['label'], d2['label'])
+                        guard = '({}) | ({})'.format(d1['guard'], d2['guard'])
+                        label = OrRule(d1['label'], d2['label'])
                         dfa.g.add_edge((u1, u2), (v1, v2), **{'weight': 0, 'input': bitmaps, 'guard': guard, 'label': label})
 
         dfa.final = {(u, v) for u, v in dfa.g.nodes() if u in dfa1.final or v in dfa2.final}
@@ -744,7 +733,7 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
         return dfa
     
     # add self-loops on final states and trap states
-    attr_dict={'weight': 0, 'input': dfa.alphabet, 'guard' : '(1)', 'label': '(1)'}
+    attr_dict={'weight': 0, 'input': dfa.alphabet, 'guard' : '(1)', 'label': TrueRule()}
     dfa1.g.add_edges_from([(s, s, attr_dict) for s in dfa1.final], **attr_dict)
     dfa2.g.add_edges_from([(s, s, attr_dict) for s in dfa2.final], **attr_dict)
     dfa1.add_trap_state()
@@ -824,7 +813,7 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     logger.debug('[union] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
     return dfa
 
-def within(phi: Fsa, low: int, high: int) -> Fsa:
+def within(phi: Fsa, low: int, high: int | None) -> Fsa:
     '''Creates either a normal or infinity version DFA corresponding to a within
     operator which encloses the formula corresponding to dfa.
     '''
@@ -832,12 +821,12 @@ def within(phi: Fsa, low: int, high: int) -> Fsa:
     
     if getDFAType() == DFAType.Normal:
         return repeat(phi, low, high)
-    elif getDFAType() == DFAType.Infinity:
+    elif getDFAType() == DFAType.Infinity or high is None:
         return eventually(phi, low, high)
     else:
         raise ValueError("Within operator deadline is invalid!")
 
-def eventually(phi_dfa: Fsa, low: int, high: int) -> Fsa:
+def eventually(phi_dfa: Fsa, low: int, high: int | None) -> Fsa:
     '''Creates a DFA which accepts the infinity version of a within operator
     which encloses the formula corresponding to phi_dfa.
     NOTE: Assumes that phi_dfa contains no ``trap'' states, i.e. states which do

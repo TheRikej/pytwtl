@@ -60,8 +60,8 @@ class _NormVisitor(TwtlVisitor):
     def visitWithinExpr(self, ctx):
         phi = self.visit(ctx.formula())
         low = int(ctx.INT(0).getText())
-        high = int(ctx.INT(1).getText())
-        if phi[1] > high - low:
+        high = int(ctx.INT(1).getText()) if len(ctx.INT()) > 1 else None
+        if high is not None and phi[1] > high - low:
             raise ValueError("Within operator deadline is invalid!")
         return (low + phi[0], high)
 
@@ -113,7 +113,7 @@ class _DfaVisitor(TwtlVisitor):
         return hold(self.props, ctx.PROP().getText(), int(ctx.INT().getText()), negation=True)
 
     def visitWithinExpr(self, ctx):
-        return within(self.visit(ctx.formula()), int(ctx.INT(0).getText()), int(ctx.INT(1).getText()))
+        return within(self.visit(ctx.formula()), int(ctx.INT(0).getText()), int(ctx.INT(1).getText()) if len(ctx.INT()) > 1 else None)
 
     def visitTemporalNegation(self, ctx):
         return self.visit(ctx.negation())
