@@ -351,21 +351,38 @@ Edges: {edges}
 		trap state has been added to the automaton.
 		"""
 		self.g.add_node('trap')
+		self.g.add_node('true_sink')
 		trap_added = False
+		true_sink_added = False
 		for s in self.g.nodes():
 			rem_alphabet = set(self.alphabet)
 			for _, _, d in self.g.out_edges(s, data=True):
 				if 'input' in d:
 					rem_alphabet -= d['input']
-			if rem_alphabet:
-				if not trap_added: #'trap' not in self.g:
-					self.g.add_edge('trap', 'trap', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': TrueRule()})
-					trap_added = True
-				self.g.add_edge(s,'trap', **{'weight': 0, 'input': rem_alphabet, 'guard': 'trap_guard', 'label': ElseRule()})
+			if s in self.final:
+				if len(rem_alphabet) == len(self.alphabet):
+					self.g.add_edge(s, s, **{'weight': 0, 'input': rem_alphabet, 'guard': '(1)', 'label': TrueRule()})
+					continue
+				if not true_sink_added: #'trap' not in self.g:
+					self.g.add_edge('true_sink', 'true_sink', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': TrueRule()})
+					true_sink_added = True
+				self.g.add_edge(s,'true_sink', **{'weight': 0, 'input': rem_alphabet, 'guard': 'true_sink_guard', 'label': ElseRule()})
+
+			
+			elif rem_alphabet:
+					if not trap_added: #'trap' not in self.g:
+						self.g.add_edge('trap', 'trap', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': TrueRule()})
+						trap_added = True
+					self.g.add_edge(s,'trap', **{'weight': 0, 'input': rem_alphabet, 'guard': 'trap_guard', 'label': ElseRule()})
 
 		if not trap_added:
 			self.g.remove_node('trap')
 			logger.info('No trap states were added.')
+		else:
+			logger.info('Trap states were added.')
+		if not true_sink_added:
+			self.g.remove_node('true_sink')
+			logger.info('No true_sinks were added.')
 		else:
 			logger.info('Trap states were added.')
 		return trap_added

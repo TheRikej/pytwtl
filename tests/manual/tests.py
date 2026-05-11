@@ -47,10 +47,10 @@ def test_complement(verbose=False, show=False):
     props = ['A', 'B', 'C']
     
     dfa = hold(props, prop='A', duration=2, negation=False)
-    dfa = eventually(dfa, low=1, high=5)
+    # dfa = eventually(dfa, low=1, high=5)
     
     if verbose:
-        print('Original DFA:')
+        print('DFA:')
         print(dfa)
         print(dfa.tree)
         # print(dfa.counters)
@@ -58,7 +58,11 @@ def test_complement(verbose=False, show=False):
         for u, v, d in dfa.g.edges(data=True):
             print((u, v), d)
     
-    complement(dfa)
+    if show:
+        dfa.visualize(draw='matplotlib')
+        plt.show()
+    
+    dfa = complement(dfa)
     
     if verbose:
         print('Complemented DFA:')
@@ -281,11 +285,11 @@ if __name__ == '__main__':
     
     # test 1: accept prop/boolean
 #     test_accept_prop_boolean(verbose=verbose, show=visualize)
-#     # test 2: complement
-#     test_complement(verbose=verbose, show=visualize)
+    # test 2: complement
+    test_complement(verbose=verbose, show=visualize)
     # test 3: intersection/union
     #setDFAType(DFAType.Infinity)
-    test_intersection_union(verbose=verbose, show=visualize)
+    # test_intersection_union(verbose=verbose, show=visualize)
     # test 5: concatenation
 #     test_concatenation(verbose=verbose, show=visualize)
     # test 6: hold

@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from runtime_monitor import VERDICT_TRUE, VERDICT_UNKNOWN
+from runtime_monitor import VERDICT_FALSE, VERDICT_TRUE, VERDICT_UNKNOWN
 from twtl import monitor_runtime
 
 
@@ -88,3 +88,14 @@ def test_monitor_runtime_integration_hold_true_accepts_any_word_of_length_two():
     assert initial == (VERDICT_TRUE, 2, 0)
     assert steps[0] == (VERDICT_TRUE, 1)
     assert steps[1] == (VERDICT_TRUE, 0)
+
+
+def test_monitor_runtime_integration_negated_proposition_accepts_only_non_a_symbols():
+    formula = '!A'
+    mon = monitor_runtime(formula=formula)
+
+    assert mon.current()[0] == VERDICT_UNKNOWN
+    assert mon.step(set()) == (VERDICT_TRUE, 0)
+
+    mon = monitor_runtime(formula=formula)
+    assert mon.step(set(['A'])) == (VERDICT_FALSE, 0)

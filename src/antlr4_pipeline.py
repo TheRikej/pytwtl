@@ -77,7 +77,16 @@ class _NormVisitor(TwtlVisitor):
         return self.visit(ctx.negation())
 
     def visitNegation(self, ctx):
-        return self.visit(ctx.atom())
+        if ctx.PROP() is not None:
+            dfa = accept_prop(self.props, prop=ctx.PROP().getText())
+            return complement(dfa) if ctx.NOT() is not None else dfa
+        if ctx.TRUE() is not None:
+            return accept_prop(self.props, boolean=True)
+        if ctx.FALSE() is not None:
+            return accept_prop(self.props, boolean=False)
+
+        dfa = self.visit(ctx.atom())
+        return complement(dfa) if ctx.NOT() is not None else dfa
 
     def visitAtom(self, ctx):
         if ctx.formula() is not None:
@@ -133,6 +142,14 @@ class _DfaVisitor(TwtlVisitor):
         return self.visit(ctx.negation())
 
     def visitNegation(self, ctx):
+        if ctx.PROP() is not None:
+            dfa = accept_prop(self.props, prop=ctx.PROP().getText())
+            return complement(dfa) if ctx.NOT() is not None else dfa
+        if ctx.TRUE() is not None:
+            return accept_prop(self.props, boolean=True)
+        if ctx.FALSE() is not None:
+            return accept_prop(self.props, boolean=False)
+
         dfa = self.visit(ctx.atom())
         return complement(dfa) if ctx.NOT() is not None else dfa
 

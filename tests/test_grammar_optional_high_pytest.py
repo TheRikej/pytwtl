@@ -12,6 +12,16 @@ from runtime_monitor import VERDICT_TRUE, VERDICT_UNKNOWN
 from twtl import monitor_runtime, norm, translate
 
 
+def _accepts(dfa, word):
+    state = next(iter(dfa.init))
+    for symbol in word:
+        nxt = dfa.next_states_of_fsa(state, symbol)
+        if len(nxt) != 1:
+            return False
+        state = nxt[0]
+    return state in dfa.final
+
+
 def test_optional_high_parses_and_sets_none_in_infinity_tree():
     _, dfa_inf = translate('[H^0 A]^[1]', kind='infinity')
     assert dfa_inf.tree.low == 1
@@ -52,3 +62,15 @@ def test_hold_true_parses_and_builds_hold_tree():
     _, dfa_inf = translate('H^1 True', kind='infinity')
     assert norm('H^1 True') == (1, 1)
     assert dfa_inf.tree.operation == Op.hold
+
+
+def test_negated_proposition_parses_as_complemented_formula():
+    _, dfa_norm = translate('!A', kind='normal')
+    assert _accepts(dfa_norm, [set()]) is True
+    assert _accepts(dfa_norm, [{'A'}]) is False
+
+
+def test_negated_parenthesized_formula_parses_and_keeps_tree():
+    _, dfa_norm = translate('!(A | B)', kind='normal')
+    assert _accepts(dfa_norm, [set()]) is True
+    assert _accepts(dfa_norm, [{'A'}]) is False

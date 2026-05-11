@@ -30,14 +30,14 @@ temporal
     ;
 
 negation
-    : NOT? atom
+    : NOT? PROP
+    | TRUE
+    | FALSE
+    | NOT? atom
     ;
 
 atom
-    : TRUE
-    | FALSE
-    | PROP
-    | LPAREN formula RPAREN
+    : LPAREN formula RPAREN
     ;
 
 AND: '&';

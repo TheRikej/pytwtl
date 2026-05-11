@@ -10,35 +10,35 @@ else:
 
 def serializedATN():
     return [
-        4,1,17,92,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
+        4,1,17,94,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
         6,2,7,7,7,1,0,1,0,1,0,1,1,1,1,1,2,1,2,1,2,5,2,25,8,2,10,2,12,2,28,
         9,2,1,3,1,3,1,3,5,3,33,8,3,10,3,12,3,36,9,3,1,4,1,4,1,4,5,4,41,8,
         4,10,4,12,4,44,9,4,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
         5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,3,5,71,8,5,
-        1,5,1,5,1,5,3,5,76,8,5,1,6,3,6,79,8,6,1,6,1,6,1,7,1,7,1,7,1,7,1,
-        7,1,7,1,7,3,7,90,8,7,1,7,0,0,8,0,2,4,6,8,10,12,14,0,0,96,0,16,1,
-        0,0,0,2,19,1,0,0,0,4,21,1,0,0,0,6,29,1,0,0,0,8,37,1,0,0,0,10,75,
-        1,0,0,0,12,78,1,0,0,0,14,89,1,0,0,0,16,17,3,2,1,0,17,18,5,0,0,1,
-        18,1,1,0,0,0,19,20,3,4,2,0,20,3,1,0,0,0,21,26,3,6,3,0,22,23,5,2,
-        0,0,23,25,3,6,3,0,24,22,1,0,0,0,25,28,1,0,0,0,26,24,1,0,0,0,26,27,
-        1,0,0,0,27,5,1,0,0,0,28,26,1,0,0,0,29,34,3,8,4,0,30,31,5,1,0,0,31,
-        33,3,8,4,0,32,30,1,0,0,0,33,36,1,0,0,0,34,32,1,0,0,0,34,35,1,0,0,
-        0,35,7,1,0,0,0,36,34,1,0,0,0,37,42,3,10,5,0,38,39,5,5,0,0,39,41,
-        3,10,5,0,40,38,1,0,0,0,41,44,1,0,0,0,42,40,1,0,0,0,42,43,1,0,0,0,
-        43,9,1,0,0,0,44,42,1,0,0,0,45,46,5,4,0,0,46,47,5,6,0,0,47,48,5,14,
-        0,0,48,76,5,15,0,0,49,50,5,4,0,0,50,51,5,6,0,0,51,52,5,14,0,0,52,
-        76,5,12,0,0,53,54,5,4,0,0,54,55,5,6,0,0,55,56,5,14,0,0,56,76,5,13,
-        0,0,57,58,5,4,0,0,58,59,5,6,0,0,59,60,5,14,0,0,60,61,5,3,0,0,61,
-        76,5,15,0,0,62,63,5,7,0,0,63,64,3,2,1,0,64,65,5,8,0,0,65,66,5,6,
-        0,0,66,67,5,7,0,0,67,70,5,14,0,0,68,69,5,11,0,0,69,71,5,14,0,0,70,
-        68,1,0,0,0,70,71,1,0,0,0,71,72,1,0,0,0,72,73,5,8,0,0,73,76,1,0,0,
-        0,74,76,3,12,6,0,75,45,1,0,0,0,75,49,1,0,0,0,75,53,1,0,0,0,75,57,
-        1,0,0,0,75,62,1,0,0,0,75,74,1,0,0,0,76,11,1,0,0,0,77,79,5,3,0,0,
-        78,77,1,0,0,0,78,79,1,0,0,0,79,80,1,0,0,0,80,81,3,14,7,0,81,13,1,
-        0,0,0,82,90,5,12,0,0,83,90,5,13,0,0,84,90,5,15,0,0,85,86,5,9,0,0,
-        86,87,3,2,1,0,87,88,5,10,0,0,88,90,1,0,0,0,89,82,1,0,0,0,89,83,1,
-        0,0,0,89,84,1,0,0,0,89,85,1,0,0,0,90,15,1,0,0,0,7,26,34,42,70,75,
-        78,89
+        1,5,1,5,1,5,3,5,76,8,5,1,6,3,6,79,8,6,1,6,1,6,1,6,1,6,3,6,85,8,6,
+        1,6,3,6,88,8,6,1,7,1,7,1,7,1,7,1,7,0,0,8,0,2,4,6,8,10,12,14,0,0,
+        99,0,16,1,0,0,0,2,19,1,0,0,0,4,21,1,0,0,0,6,29,1,0,0,0,8,37,1,0,
+        0,0,10,75,1,0,0,0,12,87,1,0,0,0,14,89,1,0,0,0,16,17,3,2,1,0,17,18,
+        5,0,0,1,18,1,1,0,0,0,19,20,3,4,2,0,20,3,1,0,0,0,21,26,3,6,3,0,22,
+        23,5,2,0,0,23,25,3,6,3,0,24,22,1,0,0,0,25,28,1,0,0,0,26,24,1,0,0,
+        0,26,27,1,0,0,0,27,5,1,0,0,0,28,26,1,0,0,0,29,34,3,8,4,0,30,31,5,
+        1,0,0,31,33,3,8,4,0,32,30,1,0,0,0,33,36,1,0,0,0,34,32,1,0,0,0,34,
+        35,1,0,0,0,35,7,1,0,0,0,36,34,1,0,0,0,37,42,3,10,5,0,38,39,5,5,0,
+        0,39,41,3,10,5,0,40,38,1,0,0,0,41,44,1,0,0,0,42,40,1,0,0,0,42,43,
+        1,0,0,0,43,9,1,0,0,0,44,42,1,0,0,0,45,46,5,4,0,0,46,47,5,6,0,0,47,
+        48,5,14,0,0,48,76,5,15,0,0,49,50,5,4,0,0,50,51,5,6,0,0,51,52,5,14,
+        0,0,52,76,5,12,0,0,53,54,5,4,0,0,54,55,5,6,0,0,55,56,5,14,0,0,56,
+        76,5,13,0,0,57,58,5,4,0,0,58,59,5,6,0,0,59,60,5,14,0,0,60,61,5,3,
+        0,0,61,76,5,15,0,0,62,63,5,7,0,0,63,64,3,2,1,0,64,65,5,8,0,0,65,
+        66,5,6,0,0,66,67,5,7,0,0,67,70,5,14,0,0,68,69,5,11,0,0,69,71,5,14,
+        0,0,70,68,1,0,0,0,70,71,1,0,0,0,71,72,1,0,0,0,72,73,5,8,0,0,73,76,
+        1,0,0,0,74,76,3,12,6,0,75,45,1,0,0,0,75,49,1,0,0,0,75,53,1,0,0,0,
+        75,57,1,0,0,0,75,62,1,0,0,0,75,74,1,0,0,0,76,11,1,0,0,0,77,79,5,
+        3,0,0,78,77,1,0,0,0,78,79,1,0,0,0,79,80,1,0,0,0,80,88,5,15,0,0,81,
+        88,5,12,0,0,82,88,5,13,0,0,83,85,5,3,0,0,84,83,1,0,0,0,84,85,1,0,
+        0,0,85,86,1,0,0,0,86,88,3,14,7,0,87,78,1,0,0,0,87,81,1,0,0,0,87,
+        82,1,0,0,0,87,84,1,0,0,0,88,13,1,0,0,0,89,90,5,9,0,0,90,91,3,2,1,
+        0,91,92,5,10,0,0,92,15,1,0,0,0,8,26,34,42,70,75,78,84,87
     ]
 
 class TwtlParser ( Parser ):
@@ -646,12 +646,21 @@ class TwtlParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def atom(self):
-            return self.getTypedRuleContext(TwtlParser.AtomContext,0)
-
+        def PROP(self):
+            return self.getToken(TwtlParser.PROP, 0)
 
         def NOT(self):
             return self.getToken(TwtlParser.NOT, 0)
+
+        def TRUE(self):
+            return self.getToken(TwtlParser.TRUE, 0)
+
+        def FALSE(self):
+            return self.getToken(TwtlParser.FALSE, 0)
+
+        def atom(self):
+            return self.getTypedRuleContext(TwtlParser.AtomContext,0)
+
 
         def getRuleIndex(self):
             return TwtlParser.RULE_negation
@@ -671,17 +680,50 @@ class TwtlParser ( Parser ):
         self.enterRule(localctx, 12, self.RULE_negation)
         self._la = 0 # Token type
         try:
-            self.enterOuterAlt(localctx, 1)
-            self.state = 78
+            self.state = 87
             self._errHandler.sync(self)
-            _la = self._input.LA(1)
-            if _la==3:
-                self.state = 77
-                self.match(TwtlParser.NOT)
+            la_ = self._interp.adaptivePredict(self._input,7,self._ctx)
+            if la_ == 1:
+                self.enterOuterAlt(localctx, 1)
+                self.state = 78
+                self._errHandler.sync(self)
+                _la = self._input.LA(1)
+                if _la==3:
+                    self.state = 77
+                    self.match(TwtlParser.NOT)
 
 
-            self.state = 80
-            self.atom()
+                self.state = 80
+                self.match(TwtlParser.PROP)
+                pass
+
+            elif la_ == 2:
+                self.enterOuterAlt(localctx, 2)
+                self.state = 81
+                self.match(TwtlParser.TRUE)
+                pass
+
+            elif la_ == 3:
+                self.enterOuterAlt(localctx, 3)
+                self.state = 82
+                self.match(TwtlParser.FALSE)
+                pass
+
+            elif la_ == 4:
+                self.enterOuterAlt(localctx, 4)
+                self.state = 84
+                self._errHandler.sync(self)
+                _la = self._input.LA(1)
+                if _la==3:
+                    self.state = 83
+                    self.match(TwtlParser.NOT)
+
+
+                self.state = 86
+                self.atom()
+                pass
+
+
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -697,15 +739,6 @@ class TwtlParser ( Parser ):
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
-
-        def TRUE(self):
-            return self.getToken(TwtlParser.TRUE, 0)
-
-        def FALSE(self):
-            return self.getToken(TwtlParser.FALSE, 0)
-
-        def PROP(self):
-            return self.getToken(TwtlParser.PROP, 0)
 
         def LPAREN(self):
             return self.getToken(TwtlParser.LPAREN, 0)
@@ -734,36 +767,13 @@ class TwtlParser ( Parser ):
         localctx = TwtlParser.AtomContext(self, self._ctx, self.state)
         self.enterRule(localctx, 14, self.RULE_atom)
         try:
+            self.enterOuterAlt(localctx, 1)
             self.state = 89
-            self._errHandler.sync(self)
-            token = self._input.LA(1)
-            if token in [12]:
-                self.enterOuterAlt(localctx, 1)
-                self.state = 82
-                self.match(TwtlParser.TRUE)
-                pass
-            elif token in [13]:
-                self.enterOuterAlt(localctx, 2)
-                self.state = 83
-                self.match(TwtlParser.FALSE)
-                pass
-            elif token in [15]:
-                self.enterOuterAlt(localctx, 3)
-                self.state = 84
-                self.match(TwtlParser.PROP)
-                pass
-            elif token in [9]:
-                self.enterOuterAlt(localctx, 4)
-                self.state = 85
-                self.match(TwtlParser.LPAREN)
-                self.state = 86
-                self.formula()
-                self.state = 87
-                self.match(TwtlParser.RPAREN)
-                pass
-            else:
-                raise NoViableAltException(self)
-
+            self.match(TwtlParser.LPAREN)
+            self.state = 90
+            self.formula()
+            self.state = 91
+            self.match(TwtlParser.RPAREN)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)

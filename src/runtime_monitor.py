@@ -1,10 +1,9 @@
-license_text='''
-    Module implements runtime monitor annotation and execution.
-'''
 
 import math
 
 import networkx as nx
+
+from lomap.classes.fsa import Fsa
 
 
 VERDICT_TRUE = 'T'
@@ -15,7 +14,7 @@ VERDICT_UNKNOWN = '?'
 class RuntimeMonitor(object):
     '''Runtime monitor with three-valued verdicts over DFA states.'''
 
-    def __init__(self, dfa):
+    def __init__(self, dfa: Fsa):
         self.dfa = dfa
         self.verdict, self.lookahead = annotate_monitor(dfa)
         self.state = list(dfa.init.keys())[0]
@@ -51,6 +50,61 @@ class RuntimeMonitor(object):
         for symbol in word:
             ret.append(self.step(symbol))
         return ret
+
+    def visualize(self, show_current=False):
+        """Visualize the monitored DFA with verdicts and lookahead.
+
+        - Nodes are labelled with their id, verdict and lookahead.
+        - Node color: green=T, red=F, lightblue=?.
+        - Current state (if any) is highlighted in yellow when `show_current`.
+        Only `matplotlib` drawing is supported (consistent with other helpers).
+        """
+        import matplotlib.pyplot as plt
+        g = self.dfa.g
+
+        pos = nx.spring_layout(g)
+
+        node_colors = []
+        labels = {}
+        for node in g.nodes():
+            v = self.verdict.get(node, VERDICT_UNKNOWN)
+            la = self.lookahead.get(node, math.inf)
+            la_str = '∞' if math.isinf(la) else str(int(la))
+            labels[node] = f"{node}\n{v} ({la_str})"
+
+            if show_current and (not self.dead) and node == self.state:
+                node_colors.append('yellow')
+            elif v == VERDICT_TRUE:
+                node_colors.append('green')
+            elif v == VERDICT_FALSE:
+                node_colors.append('red')
+            else:
+                node_colors.append('lightblue')
+
+        # Draw main graph
+        nx.draw(g, pos=pos, node_color=node_colors, with_labels=False)
+        nx.draw_networkx_labels(g, pos=pos, labels=labels)
+        edge_labels = nx.get_edge_attributes(g, 'label')
+        nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=edge_labels)
+
+        # Draw an arrow marker for the initial state
+        init = next(iter(self.dfa.init.keys()))
+        # compute a marker position slightly left of the node
+        node_pos = pos.get(init, (0.0, 0.0))
+        try:
+            mx = node_pos[0] - 0.12
+            my = node_pos[1]
+        except Exception:
+            mx, my = (node_pos[0] - 0.12, node_pos[1])
+        marker = f'__init_marker__'
+        pos_marker = dict(pos)
+        pos_marker[marker] = (mx, my)
+
+        # draw marker node (triangle) and an arrow edge to the init node
+        # nx.draw_networkx_nodes(g, pos=pos_marker, nodelist=[marker], node_color=['black'], node_shape='>', node_size=300)
+        nx.draw_networkx_edges(g, pos=pos_marker, edgelist=[(marker, init)], arrows=True, arrowsize=20)
+
+        plt.show()
 
 
 def _build_scc_dag(g):
@@ -91,8 +145,6 @@ def annotate_monitor(dfa):
         states = sccs[cid]
         succ = list(dag.successors(cid))
 
-        has_cycle = (len(states) > 1) or any(g.has_edge(s, s) for s in states)
-
         if len(states) > 1:
             comp_verdict[cid] = VERDICT_UNKNOWN
             comp_lookahead[cid] = math.inf
@@ -109,10 +161,6 @@ def annotate_monitor(dfa):
             continue
 
         # A singleton cyclic SCC with exits may postpone decisions forever.
-        if has_cycle:
-            comp_verdict[cid] = VERDICT_UNKNOWN
-            comp_lookahead[cid] = math.inf
-            continue
 
         succ_verdicts = set(comp_verdict[s] for s in succ)
         succ_bounds = [comp_lookahead[s] for s in succ]
@@ -126,6 +174,12 @@ def annotate_monitor(dfa):
 
         if any(math.isinf(v) for v in succ_bounds):
             comp_lookahead[cid] = math.inf
+        elif any(g.has_edge(s, s) for s in states):
+            if comp_verdict[cid] != (VERDICT_TRUE if q in finals else VERDICT_FALSE):
+                comp_verdict[cid] = VERDICT_UNKNOWN
+                comp_lookahead[cid] = math.inf
+            else:
+                comp_lookahead[cid] = 0
         else:
             comp_lookahead[cid] = 1 + max(succ_bounds)
 

@@ -28,6 +28,7 @@ license_text='''
 
 import logging
 import copy
+import math
 
 from transition_rules import *
 logger = logging.getLogger(__name__)
@@ -246,7 +247,7 @@ def init_tree(dfa: Fsa, operation=Op.nop):
         assert operation in Op.operations
         dfa.tree = DFATreeNode(operation, init=dfa.init.keys(), final=dfa.final)
 
-def mark_eventually(dfa_src: Fsa, dfa_dest: Fsa, low: int, high: int):
+def mark_eventually(dfa_src: Fsa, dfa_dest: Fsa, low: int, high: int | None = None):
     '''Creates a new AST tree node corresponding to a within operator and adds
     it to the destination automaton `dfa_dest`. The child subtree is copied from
     the source automaton `dfa_src`.
@@ -254,7 +255,7 @@ def mark_eventually(dfa_src: Fsa, dfa_dest: Fsa, low: int, high: int):
     # create new AST tree
     dfa_dest.tree = DFATreeNode(Op.event, left=dfa_src.tree, right=None,
                                 init=dfa_dest.init.keys(), final=dfa_dest.final,
-                                low=low, high=high)
+                                low=low, high=math.inf if high is None else high)
     # update flags
     dfa_dest.tree.wdf = (dfa_src.tree.ndj == 0)
     assert dfa_dest.tree.wdf, 'Need within-disjunction free form!'
@@ -531,15 +532,8 @@ def hold(props: list[str], prop: str, duration: int, negation:bool=False, boolea
     return dfa
 
 def complement(dfa: Fsa) -> Fsa:
-    '''Negation (complementation) is not supported for TWTL formulae in the
-    current implementation, since we are using the assumption that automata have
-    only one final state. This assumption does not hold under the normal
-    definition of complementation. In the future, we are going to introduce a
-    special complement operation which preserves this property and is tailored
-    for specifications with time-windows.
-    '''
     # Ensure total transition function before complementing.
-    dfa.add_trap_state()
+    # dfa.add_trap_state()
     dfa.final = set(dfa.g.nodes()) - set(dfa.final)
     return dfa
 
@@ -819,29 +813,28 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     logger.debug('[union] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
     return dfa
 
-def within(phi: Fsa, low: int, high: int | None) -> Fsa:
+def within(phi_dfa: Fsa, low: int, high: int | None) -> Fsa:
     '''Creates either a normal or infinity version DFA corresponding to a within
     operator which encloses the formula corresponding to dfa.
     '''
-    assert len(phi.init) == 1 and len(phi.final) == 1
-    
-    if getDFAType() == DFAType.Normal:
-        return repeat(phi, low, high)
-    elif getDFAType() == DFAType.Infinity or high is None:
-        return eventually(phi, low, high)
-    else:
-        raise ValueError("Within operator deadline is invalid!")
+    # assert len(phi.init) == 1 and len(phi.final) == 1
+    # phi_dfa.remove_trap_states()
 
-def eventually(phi_dfa: Fsa, low: int, high: int | None) -> Fsa:
+    if high is None:
+        return eventually(phi_dfa, low)
+    return repeat(phi_dfa, low, high)
+
+
+def eventually(phi_dfa: Fsa, low: int) -> Fsa:
     '''Creates a DFA which accepts the infinity version of a within operator
     which encloses the formula corresponding to phi_dfa.
     NOTE: Assumes that phi_dfa contains no ``trap'' states, i.e. states which do
     not reach a final state. 
     '''
     dfa = phi_dfa.clone()
-    dfa.name = '(Eventually {} {} {} )'.format(phi_dfa.name, low, high)
+    dfa.name = '(Eventually {} {})'.format(phi_dfa.name, low)
     
-    init = next(iter(dfa.init.keys()))
+    init = next(iter(dfa.init.keys())) #TODO change init to single state
     for state in dfa.g.nodes():
         bitmaps = set()
         guard = '(else)'
@@ -859,16 +852,15 @@ def eventually(phi_dfa: Fsa, low: int, high: int | None) -> Fsa:
         guard = '(1)'
         label = TrueRule()
         bitmaps = dfa.get_guard_bitmap(guard)
-        # ngen = it.count(start=dfa.g.number_of_nodes())
-        nodes = [i for i in range(dfa.g.number_of_nodes(), dfa.g.number_of_nodes()+low)] #TODO check
+        nodes = [i for i in range(dfa.g.number_of_nodes(), dfa.g.number_of_nodes()+low)]
         attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
         nx.add_path(dfa.g, nodes, **attr_dict)
         dfa.g.add_edge(nodes[-1], init, **attr_dict)
         dfa.init = {nodes[0] : 1}
     
     # add counter annotation
-    mark_eventually(phi_dfa, dfa, low, high)
-    logger.debug('[eventually] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
+    mark_eventually(phi_dfa, dfa, low)
+    logger.debug('[eventually] Low: {} DFA: {}'.format(low, phi_dfa.name))
     return dfa
 
 def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
@@ -876,13 +868,11 @@ def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
     operator which encloses the formula corresponding to phi_dfa.
     '''
     assert len(phi_dfa.init) == 1
-    assert len(phi_dfa.final) == 1
+    # assert len(phi_dfa.final) == 1
     
     init_state = next(iter(phi_dfa.init.keys()))
     final_state = set(phi_dfa.final).pop()
     
-    # remove trap states if there are any
-    phi_dfa.remove_trap_states()
     # initialize the resulting dfa
     dfa = Fsa(phi_dfa.props, phi_dfa.directed, phi_dfa.multi)
     dfa.name = '(Repeat {} {} {} )'.format(phi_dfa.name, low, high)
