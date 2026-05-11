@@ -79,3 +79,12 @@ def test_monitor_runtime_integration_optional_high_conjunction_needs_both_obliga
     assert steps[0][0] == VERDICT_UNKNOWN
     assert math.isinf(steps[0][1])
     assert steps[1] == (VERDICT_TRUE, 0)
+
+
+def test_monitor_runtime_integration_hold_true_accepts_any_word_of_length_two():
+    formula = 'H^1 True'
+    initial, steps = _run_formula_monitor(formula, [set(), set()])
+
+    assert initial == (VERDICT_TRUE, 2, 0)
+    assert steps[0] == (VERDICT_TRUE, 1)
+    assert steps[1] == (VERDICT_TRUE, 0)

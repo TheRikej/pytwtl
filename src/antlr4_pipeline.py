@@ -53,6 +53,14 @@ class _NormVisitor(TwtlVisitor):
         duration = int(ctx.INT().getText())
         return (duration, duration)
 
+    def visitHoldTrue(self, ctx):
+        duration = int(ctx.INT().getText())
+        return (duration, duration)
+
+    def visitHoldFalse(self, ctx):
+        duration = int(ctx.INT().getText())
+        return (duration, duration)
+
     def visitHoldNegProp(self, ctx):
         duration = int(ctx.INT().getText())
         return (duration, duration)
@@ -108,6 +116,12 @@ class _DfaVisitor(TwtlVisitor):
 
     def visitHoldProp(self, ctx):
         return hold(self.props, ctx.PROP().getText(), int(ctx.INT().getText()), negation=False)
+
+    def visitHoldTrue(self, ctx):
+        return hold(self.props, 'True', int(ctx.INT().getText()), boolean=True)
+
+    def visitHoldFalse(self, ctx):
+        return hold(self.props, 'False', int(ctx.INT().getText()), boolean=False)
 
     def visitHoldNegProp(self, ctx):
         return hold(self.props, ctx.PROP().getText(), int(ctx.INT().getText()), negation=True)

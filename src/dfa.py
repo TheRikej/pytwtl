@@ -497,18 +497,24 @@ def accept_prop(props: list[str], prop:str|None=None, boolean:bool|None=None):
     init_tree(dfa, operation=Op.accept)
     return dfa
 
-def hold(props: list[str], prop: str, duration: int, negation:bool=False):
+def hold(props: list[str], prop: str, duration: int, negation:bool=False, boolean:bool|None=None):
     '''Creates a DFA which accepts a sequence of symbols all containing
     proposition prop. The length of the sequence is duration+1 corresponding to
     duration time intervals. If negation is True, then the symbols must not
     contain prop instead.
     '''
-    assert prop in props
-    
-    guard = prop if not negation else '!' + prop
-    label = AtomicPropositionRule(prop) if not negation else NegationRule(AtomicPropositionRule(prop))
+    if boolean is not None:
+        assert type(boolean) == bool
+        guard = '(1)' if boolean else '(0)'
+        label = TrueRule() if boolean else EmptyRule()
+        name_prop = str(boolean)
+    else:
+        assert prop in props
+        guard = prop if not negation else '!' + prop
+        label = AtomicPropositionRule(prop) if not negation else NegationRule(AtomicPropositionRule(prop))
+        name_prop = 'not ' + prop if negation else prop
     dfa = Fsa(props, directed=True, multi=False)
-    dfa.name = '(Hold {} {}{} )'.format(duration, 'not ' if negation else '', prop)
+    dfa.name = '(Hold {} {} )'.format(duration, name_prop)
     bitmaps = dfa.get_guard_bitmap(guard)
     
     ngen = it.count()
@@ -521,7 +527,7 @@ def hold(props: list[str], prop: str, duration: int, negation:bool=False):
     dfa.final.add(v)
     
     init_tree(dfa, operation=Op.hold)
-    logger.debug('[hold] Prop: {} Duration: {} Negation: {} Props: {}'.format(prop, duration, negation, props))
+    logger.debug('[hold] Prop: {} Duration: {} Negation: {} Boolean: {} Props: {}'.format(prop, duration, negation, boolean, props))
     return dfa
 
 def complement(dfa: Fsa) -> Fsa:

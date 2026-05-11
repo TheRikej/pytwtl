@@ -39,6 +39,16 @@ class TwtlVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by TwtlParser#holdTrue.
+    def visitHoldTrue(self, ctx:TwtlParser.HoldTrueContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by TwtlParser#holdFalse.
+    def visitHoldFalse(self, ctx:TwtlParser.HoldFalseContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by TwtlParser#holdNegProp.
     def visitHoldNegProp(self, ctx:TwtlParser.HoldNegPropContext):
         return self.visitChildren(ctx)

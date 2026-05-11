@@ -10,32 +10,35 @@ else:
 
 def serializedATN():
     return [
-        4,1,17,84,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
+        4,1,17,92,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
         6,2,7,7,7,1,0,1,0,1,0,1,1,1,1,1,2,1,2,1,2,5,2,25,8,2,10,2,12,2,28,
         9,2,1,3,1,3,1,3,5,3,33,8,3,10,3,12,3,36,9,3,1,4,1,4,1,4,5,4,41,8,
         4,10,4,12,4,44,9,4,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,
-        5,1,5,1,5,1,5,1,5,1,5,3,5,63,8,5,1,5,1,5,1,5,3,5,68,8,5,1,6,3,6,
-        71,8,6,1,6,1,6,1,7,1,7,1,7,1,7,1,7,1,7,1,7,3,7,82,8,7,1,7,0,0,8,
-        0,2,4,6,8,10,12,14,0,0,86,0,16,1,0,0,0,2,19,1,0,0,0,4,21,1,0,0,0,
-        6,29,1,0,0,0,8,37,1,0,0,0,10,67,1,0,0,0,12,70,1,0,0,0,14,81,1,0,
-        0,0,16,17,3,2,1,0,17,18,5,0,0,1,18,1,1,0,0,0,19,20,3,4,2,0,20,3,
-        1,0,0,0,21,26,3,6,3,0,22,23,5,2,0,0,23,25,3,6,3,0,24,22,1,0,0,0,
-        25,28,1,0,0,0,26,24,1,0,0,0,26,27,1,0,0,0,27,5,1,0,0,0,28,26,1,0,
-        0,0,29,34,3,8,4,0,30,31,5,1,0,0,31,33,3,8,4,0,32,30,1,0,0,0,33,36,
-        1,0,0,0,34,32,1,0,0,0,34,35,1,0,0,0,35,7,1,0,0,0,36,34,1,0,0,0,37,
-        42,3,10,5,0,38,39,5,5,0,0,39,41,3,10,5,0,40,38,1,0,0,0,41,44,1,0,
-        0,0,42,40,1,0,0,0,42,43,1,0,0,0,43,9,1,0,0,0,44,42,1,0,0,0,45,46,
-        5,4,0,0,46,47,5,6,0,0,47,48,5,14,0,0,48,68,5,15,0,0,49,50,5,4,0,
-        0,50,51,5,6,0,0,51,52,5,14,0,0,52,53,5,3,0,0,53,68,5,15,0,0,54,55,
-        5,7,0,0,55,56,3,2,1,0,56,57,5,8,0,0,57,58,5,6,0,0,58,59,5,7,0,0,
-        59,62,5,14,0,0,60,61,5,11,0,0,61,63,5,14,0,0,62,60,1,0,0,0,62,63,
-        1,0,0,0,63,64,1,0,0,0,64,65,5,8,0,0,65,68,1,0,0,0,66,68,3,12,6,0,
-        67,45,1,0,0,0,67,49,1,0,0,0,67,54,1,0,0,0,67,66,1,0,0,0,68,11,1,
-        0,0,0,69,71,5,3,0,0,70,69,1,0,0,0,70,71,1,0,0,0,71,72,1,0,0,0,72,
-        73,3,14,7,0,73,13,1,0,0,0,74,82,5,12,0,0,75,82,5,13,0,0,76,82,5,
-        15,0,0,77,78,5,9,0,0,78,79,3,2,1,0,79,80,5,10,0,0,80,82,1,0,0,0,
-        81,74,1,0,0,0,81,75,1,0,0,0,81,76,1,0,0,0,81,77,1,0,0,0,82,15,1,
-        0,0,0,7,26,34,42,62,67,70,81
+        5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,1,5,3,5,71,8,5,
+        1,5,1,5,1,5,3,5,76,8,5,1,6,3,6,79,8,6,1,6,1,6,1,7,1,7,1,7,1,7,1,
+        7,1,7,1,7,3,7,90,8,7,1,7,0,0,8,0,2,4,6,8,10,12,14,0,0,96,0,16,1,
+        0,0,0,2,19,1,0,0,0,4,21,1,0,0,0,6,29,1,0,0,0,8,37,1,0,0,0,10,75,
+        1,0,0,0,12,78,1,0,0,0,14,89,1,0,0,0,16,17,3,2,1,0,17,18,5,0,0,1,
+        18,1,1,0,0,0,19,20,3,4,2,0,20,3,1,0,0,0,21,26,3,6,3,0,22,23,5,2,
+        0,0,23,25,3,6,3,0,24,22,1,0,0,0,25,28,1,0,0,0,26,24,1,0,0,0,26,27,
+        1,0,0,0,27,5,1,0,0,0,28,26,1,0,0,0,29,34,3,8,4,0,30,31,5,1,0,0,31,
+        33,3,8,4,0,32,30,1,0,0,0,33,36,1,0,0,0,34,32,1,0,0,0,34,35,1,0,0,
+        0,35,7,1,0,0,0,36,34,1,0,0,0,37,42,3,10,5,0,38,39,5,5,0,0,39,41,
+        3,10,5,0,40,38,1,0,0,0,41,44,1,0,0,0,42,40,1,0,0,0,42,43,1,0,0,0,
+        43,9,1,0,0,0,44,42,1,0,0,0,45,46,5,4,0,0,46,47,5,6,0,0,47,48,5,14,
+        0,0,48,76,5,15,0,0,49,50,5,4,0,0,50,51,5,6,0,0,51,52,5,14,0,0,52,
+        76,5,12,0,0,53,54,5,4,0,0,54,55,5,6,0,0,55,56,5,14,0,0,56,76,5,13,
+        0,0,57,58,5,4,0,0,58,59,5,6,0,0,59,60,5,14,0,0,60,61,5,3,0,0,61,
+        76,5,15,0,0,62,63,5,7,0,0,63,64,3,2,1,0,64,65,5,8,0,0,65,66,5,6,
+        0,0,66,67,5,7,0,0,67,70,5,14,0,0,68,69,5,11,0,0,69,71,5,14,0,0,70,
+        68,1,0,0,0,70,71,1,0,0,0,71,72,1,0,0,0,72,73,5,8,0,0,73,76,1,0,0,
+        0,74,76,3,12,6,0,75,45,1,0,0,0,75,49,1,0,0,0,75,53,1,0,0,0,75,57,
+        1,0,0,0,75,62,1,0,0,0,75,74,1,0,0,0,76,11,1,0,0,0,77,79,5,3,0,0,
+        78,77,1,0,0,0,78,79,1,0,0,0,79,80,1,0,0,0,80,81,3,14,7,0,81,13,1,
+        0,0,0,82,90,5,12,0,0,83,90,5,13,0,0,84,90,5,15,0,0,85,86,5,9,0,0,
+        86,87,3,2,1,0,87,88,5,10,0,0,88,90,1,0,0,0,89,82,1,0,0,0,89,83,1,
+        0,0,0,89,84,1,0,0,0,89,85,1,0,0,0,90,15,1,0,0,0,7,26,34,42,70,75,
+        78,89
     ]
 
 class TwtlParser ( Parser ):
@@ -465,6 +468,28 @@ class TwtlParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
+    class HoldFalseContext(TemporalContext):
+
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a TwtlParser.TemporalContext
+            super().__init__(parser)
+            self.copyFrom(ctx)
+
+        def HOLD(self):
+            return self.getToken(TwtlParser.HOLD, 0)
+        def CARET(self):
+            return self.getToken(TwtlParser.CARET, 0)
+        def INT(self):
+            return self.getToken(TwtlParser.INT, 0)
+        def FALSE(self):
+            return self.getToken(TwtlParser.FALSE, 0)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitHoldFalse" ):
+                return visitor.visitHoldFalse(self)
+            else:
+                return visitor.visitChildren(self)
+
+
     class TemporalNegationContext(TemporalContext):
 
         def __init__(self, parser, ctx:ParserRuleContext): # actually a TwtlParser.TemporalContext
@@ -482,6 +507,28 @@ class TwtlParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
+    class HoldTrueContext(TemporalContext):
+
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a TwtlParser.TemporalContext
+            super().__init__(parser)
+            self.copyFrom(ctx)
+
+        def HOLD(self):
+            return self.getToken(TwtlParser.HOLD, 0)
+        def CARET(self):
+            return self.getToken(TwtlParser.CARET, 0)
+        def INT(self):
+            return self.getToken(TwtlParser.INT, 0)
+        def TRUE(self):
+            return self.getToken(TwtlParser.TRUE, 0)
+
+        def accept(self, visitor:ParseTreeVisitor):
+            if hasattr( visitor, "visitHoldTrue" ):
+                return visitor.visitHoldTrue(self)
+            else:
+                return visitor.visitChildren(self)
+
+
 
     def temporal(self):
 
@@ -489,7 +536,7 @@ class TwtlParser ( Parser ):
         self.enterRule(localctx, 10, self.RULE_temporal)
         self._la = 0 # Token type
         try:
-            self.state = 67
+            self.state = 75
             self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,4,self._ctx)
             if la_ == 1:
@@ -506,7 +553,7 @@ class TwtlParser ( Parser ):
                 pass
 
             elif la_ == 2:
-                localctx = TwtlParser.HoldNegPropContext(self, localctx)
+                localctx = TwtlParser.HoldTrueContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
                 self.state = 49
                 self.match(TwtlParser.HOLD)
@@ -515,44 +562,70 @@ class TwtlParser ( Parser ):
                 self.state = 51
                 self.match(TwtlParser.INT)
                 self.state = 52
-                self.match(TwtlParser.NOT)
-                self.state = 53
-                self.match(TwtlParser.PROP)
+                self.match(TwtlParser.TRUE)
                 pass
 
             elif la_ == 3:
-                localctx = TwtlParser.WithinExprContext(self, localctx)
+                localctx = TwtlParser.HoldFalseContext(self, localctx)
                 self.enterOuterAlt(localctx, 3)
+                self.state = 53
+                self.match(TwtlParser.HOLD)
                 self.state = 54
-                self.match(TwtlParser.LBRACK)
-                self.state = 55
-                self.formula()
-                self.state = 56
-                self.match(TwtlParser.RBRACK)
-                self.state = 57
                 self.match(TwtlParser.CARET)
-                self.state = 58
-                self.match(TwtlParser.LBRACK)
-                self.state = 59
+                self.state = 55
                 self.match(TwtlParser.INT)
-                self.state = 62
-                self._errHandler.sync(self)
-                _la = self._input.LA(1)
-                if _la==11:
-                    self.state = 60
-                    self.match(TwtlParser.COMMA)
-                    self.state = 61
-                    self.match(TwtlParser.INT)
-
-
-                self.state = 64
-                self.match(TwtlParser.RBRACK)
+                self.state = 56
+                self.match(TwtlParser.FALSE)
                 pass
 
             elif la_ == 4:
-                localctx = TwtlParser.TemporalNegationContext(self, localctx)
+                localctx = TwtlParser.HoldNegPropContext(self, localctx)
                 self.enterOuterAlt(localctx, 4)
+                self.state = 57
+                self.match(TwtlParser.HOLD)
+                self.state = 58
+                self.match(TwtlParser.CARET)
+                self.state = 59
+                self.match(TwtlParser.INT)
+                self.state = 60
+                self.match(TwtlParser.NOT)
+                self.state = 61
+                self.match(TwtlParser.PROP)
+                pass
+
+            elif la_ == 5:
+                localctx = TwtlParser.WithinExprContext(self, localctx)
+                self.enterOuterAlt(localctx, 5)
+                self.state = 62
+                self.match(TwtlParser.LBRACK)
+                self.state = 63
+                self.formula()
+                self.state = 64
+                self.match(TwtlParser.RBRACK)
+                self.state = 65
+                self.match(TwtlParser.CARET)
                 self.state = 66
+                self.match(TwtlParser.LBRACK)
+                self.state = 67
+                self.match(TwtlParser.INT)
+                self.state = 70
+                self._errHandler.sync(self)
+                _la = self._input.LA(1)
+                if _la==11:
+                    self.state = 68
+                    self.match(TwtlParser.COMMA)
+                    self.state = 69
+                    self.match(TwtlParser.INT)
+
+
+                self.state = 72
+                self.match(TwtlParser.RBRACK)
+                pass
+
+            elif la_ == 6:
+                localctx = TwtlParser.TemporalNegationContext(self, localctx)
+                self.enterOuterAlt(localctx, 6)
+                self.state = 74
                 self.negation()
                 pass
 
@@ -599,15 +672,15 @@ class TwtlParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 70
+            self.state = 78
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==3:
-                self.state = 69
+                self.state = 77
                 self.match(TwtlParser.NOT)
 
 
-            self.state = 72
+            self.state = 80
             self.atom()
         except RecognitionException as re:
             localctx.exception = re
@@ -661,31 +734,31 @@ class TwtlParser ( Parser ):
         localctx = TwtlParser.AtomContext(self, self._ctx, self.state)
         self.enterRule(localctx, 14, self.RULE_atom)
         try:
-            self.state = 81
+            self.state = 89
             self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [12]:
                 self.enterOuterAlt(localctx, 1)
-                self.state = 74
+                self.state = 82
                 self.match(TwtlParser.TRUE)
                 pass
             elif token in [13]:
                 self.enterOuterAlt(localctx, 2)
-                self.state = 75
+                self.state = 83
                 self.match(TwtlParser.FALSE)
                 pass
             elif token in [15]:
                 self.enterOuterAlt(localctx, 3)
-                self.state = 76
+                self.state = 84
                 self.match(TwtlParser.PROP)
                 pass
             elif token in [9]:
                 self.enterOuterAlt(localctx, 4)
-                self.state = 77
+                self.state = 85
                 self.match(TwtlParser.LPAREN)
-                self.state = 78
+                self.state = 86
                 self.formula()
-                self.state = 79
+                self.state = 87
                 self.match(TwtlParser.RPAREN)
                 pass
             else:

@@ -6,6 +6,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+from dfa import Op
 from antlr4_pipeline import parse_formula
 from runtime_monitor import VERDICT_TRUE, VERDICT_UNKNOWN
 from twtl import monitor_runtime, norm, translate
@@ -45,3 +46,9 @@ def test_runtime_monitor_accepts_optional_high_formula_on_witness():
 
     step2 = mon.step(set(['A']))
     assert step2 == (VERDICT_TRUE, 0)
+
+
+def test_hold_true_parses_and_builds_hold_tree():
+    _, dfa_inf = translate('H^1 True', kind='infinity')
+    assert norm('H^1 True') == (1, 1)
+    assert dfa_inf.tree.operation == Op.hold
