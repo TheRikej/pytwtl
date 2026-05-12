@@ -38,6 +38,7 @@ from io import StringIO
 import networkx as nx
 
 from lomap import Fsa, Nfa
+from automata_bridge import automata_dfa_to_fsa, fsa_to_automata_dfa
 
 
 class DFAType(object):
@@ -287,7 +288,7 @@ def mark_product(dfa_src1: Fsa, dfa_src2: Fsa, dfa_dest: Fsa, operation:int, cho
     for u, v in dfa_dest.g.nodes():
         if u in mapping:
             mapping[u].append((u, v))
-    dfa_src1.tree.relabel(mapping, expand=True)
+    # dfa_src1.tree.relabel(mapping, expand=True)
     # relabel data in right tree
     mapping = dict([(v, []) for v in dfa_src2.g.nodes()])
     for u, v in dfa_dest.g.nodes():
@@ -340,128 +341,17 @@ def relabel_dfa(dfa: Fsa, mapping:dict|None=None, start=0, copy=False):
 
 
 def minimize_dfa(dfa: Fsa) -> Fsa:
-    '''Minimizes a deterministic DFA by merging language-equivalent states.
+    """Minimizes a deterministic DFA using automata-lib.
 
-    The implementation uses iterative partition refinement (Moore-style)
-    on reachable states. Missing transitions are interpreted as transitions
-    to an implicit rejecting sink. If overlapping guards induce
-    nondeterminism for some symbol, minimization is skipped and the original
-    automaton is returned unchanged.
-    '''
-    if not dfa.g.nodes() or not dfa.init:
+    The input and output remain LOMAP FSA instances for compatibility.
+    """
+    try:
+        auto_dfa = fsa_to_automata_dfa(dfa)
+        min_auto = auto_dfa.minify(retain_names=False)
+        return automata_dfa_to_fsa(min_auto, dfa.props, template=dfa)
+    except Exception as exc:
+        logger.warning('[minimize_dfa] automata-lib minimization failed (%s). Returning original DFA.', exc)
         return dfa
-
-    # compute reachable states from all initial states
-    reachable = set()
-    for init_state in dfa.init.keys():
-        if init_state in dfa.g:
-            reachable.add(init_state)
-            reachable |= nx.descendants(dfa.g, init_state)
-
-    if not reachable:
-        return dfa
-
-    alphabet = set(dfa.alphabet)
-
-    # deterministic transition function delta[q][symbol] -> q'
-    delta = {q: {} for q in reachable}
-    for q in reachable:
-        for _, v, data in dfa.g.out_edges(q, data=True):
-            if v not in reachable:
-                continue
-            symbols = set(data.get('input', set())) & alphabet
-            for sym in symbols:
-                prev = delta[q].get(sym, None)
-                if prev is not None and prev != v:
-                    logger.warning('[minimize_dfa] Nondeterministic transitions detected at state %s symbol %s. Skipping minimization.', q, sym)
-                    return dfa
-                delta[q][sym] = v
-
-    finals = set(dfa.final) & reachable
-
-    # initialize partition by acceptance status
-    partition = [set(finals), set(reachable - finals)]
-    partition = [p for p in partition if p]
-
-    def state_to_block(parts):
-        block_of = {}
-        for bid, block in enumerate(parts):
-            for s in block:
-                block_of[s] = bid
-        return block_of
-
-    # refine partition until fixed point
-    while True:
-        block_of = state_to_block(partition)
-        new_partition = []
-        for block in partition:
-            signatures = {}
-            for q in block:
-                sig = tuple(block_of.get(delta[q].get(sym, None), -1)
-                            for sym in sorted(alphabet))
-                signatures.setdefault(sig, set()).add(q)
-            new_partition.extend(signatures.values())
-        if len(new_partition) == len(partition):
-            unchanged = True
-            for b_old in partition:
-                if not any(b_old == b_new for b_new in new_partition):
-                    unchanged = False
-                    break
-            if unchanged:
-                partition = new_partition
-                break
-        partition = new_partition
-
-    # build minimized automaton
-    block_of = state_to_block(partition)
-    min_dfa = Fsa(dfa.props, dfa.directed, dfa.multi)
-    min_dfa.name = str(dfa.name)
-    if hasattr(dfa, 'kind'):
-        min_dfa.kind = dfa.kind
-
-    # preserved initial/final sets
-    min_dfa.init = {block_of[s]: 1 for s in dfa.init.keys() if s in block_of}
-    min_dfa.final = {block_of[s] for s in finals}
-
-    # aggregate edge labels by (source_block, target_block)
-    edge_data = {}
-    for q in reachable:
-        bq = block_of[q]
-        for _, v, data in dfa.g.out_edges(q, data=True):
-            if v not in block_of:
-                continue
-            bv = block_of[v]
-            key = (bq, bv)
-            e = edge_data.setdefault(key, {'input': set(), 'guards': [], 'labels': []})
-            e['input'] |= (set(data.get('input', set())) & alphabet)
-            guard = data.get('guard', None)
-            if guard is not None:
-                e['guards'].append(str(guard))
-                e['labels'].append(data.get('label'))
-
-    for (u, v), data in edge_data.items():
-        bitmaps = data['input']
-        if not bitmaps:
-            continue
-        guards = data['guards']
-        if not guards:
-            guard = '(min)'#TODO
-            label = EmptyRule()
-        else:
-            uniq = []
-            seen = set()
-            for g in guards:
-                if g not in seen:
-                    uniq.append(g)
-                    seen.add(g)
-            guard = uniq[0] if len(uniq) == 1 else ' | '.join(['({})'.format(g) for g in uniq])
-            label = data['labels'][0] #TODO fix
-        min_dfa.g.add_edge(u, v, **{'weight': 0, 'input': bitmaps,
-                                    'guard': guard, 'label': label})
-
-    # normalize labels to contiguous integers
-    relabel_dfa(min_dfa, start=0)
-    return min_dfa
 
 
 
@@ -532,10 +422,21 @@ def hold(props: list[str], prop: str, duration: int, negation:bool=False, boolea
     return dfa
 
 def complement(dfa: Fsa) -> Fsa:
-    # Ensure total transition function before complementing.
-    dfa.add_trap_state()
-    dfa.final = set(dfa.g.nodes()) - set(dfa.final)
-    return dfa
+    """Complements the DFA using automata-lib while preserving Fsa wrapper."""
+    try:
+        auto_dfa = fsa_to_automata_dfa(dfa)
+        comp_auto = auto_dfa.complement(minify=False)
+        comp_fsa = automata_dfa_to_fsa(comp_auto, dfa.props, template=dfa)
+        dfa.g = comp_fsa.g
+        dfa.init = comp_fsa.init
+        dfa.final = comp_fsa.final
+        dfa.alphabet = comp_fsa.alphabet
+        return dfa
+    except Exception as exc:
+        logger.warning('[complement] automata-lib complement failed (%s). Falling back to trap-state complement.', exc)
+        dfa.add_trap_state()
+        dfa.final = set(dfa.g.nodes()) - set(dfa.final)
+        return dfa
 
 def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     '''Creates a DFA which accepts the language of concatenated word accepted by
@@ -620,7 +521,8 @@ def intersection(dfa1: Fsa, dfa2: Fsa) -> Fsa:
         dfa.final = {(u, v) for u, v in dfa.g.nodes() if u in dfa1.final and v in dfa2.final}
 
         if getDFAType() == DFAType.Infinity:
-            mark_product(dfa1, dfa2, dfa, Op.intersection)
+            # mark_product(dfa1, dfa2, dfa, Op.intersection)
+            pass
         elif getDFAType() == DFAType.Normal:
             dfa = minimize_dfa(dfa)
         else:
@@ -671,7 +573,8 @@ def intersection(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     dfa.final = set(it.product(dfa1.final, dfa2.final))
     
     if getDFAType() == DFAType.Infinity:
-        mark_product(dfa1, dfa2, dfa, Op.intersection)
+        # mark_product(dfa1, dfa2, dfa, Op.intersection)
+        pass
     elif getDFAType() == DFAType.Normal:
         # minimize the DFA
         dfa = minimize_dfa(dfa)
@@ -723,7 +626,8 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
         dfa.final = {(u, v) for u, v in dfa.g.nodes() if u in dfa1.final or v in dfa2.final}
 
         if getDFAType() == DFAType.Infinity:
-            mark_product(dfa1, dfa2, dfa, Op.union, choices)
+            # mark_product(dfa1, dfa2, dfa, Op.union, choices)
+            pass
         elif getDFAType() == DFAType.Normal:
             dfa = minimize_dfa(dfa)
         else:
@@ -800,7 +704,8 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
         dfa.final = set([final])
     
     if getDFAType() == DFAType.Infinity:
-        mark_product(dfa1, dfa2, dfa, Op.union, choices)
+        # mark_product(dfa1, dfa2, dfa, Op.union, choices)
+        pass
     elif getDFAType() == DFAType.Normal:
         # minimize the DFA
         dfa = minimize_dfa(dfa)

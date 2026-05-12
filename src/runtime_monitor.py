@@ -1,8 +1,13 @@
 
 import math
+from functools import reduce
+import operator as op
 
 import networkx as nx
 
+from automata.fa.dfa import DFA
+
+from automata_bridge import fsa_to_automata_dfa
 from lomap.classes.fsa import Fsa
 
 
@@ -11,14 +16,63 @@ VERDICT_FALSE = 'F'
 VERDICT_UNKNOWN = '?'
 
 
+def _as_automata_dfa(dfa):
+    if isinstance(dfa, DFA):
+        return dfa
+    if isinstance(dfa, Fsa):
+        return fsa_to_automata_dfa(dfa)
+    raise TypeError('Expected a LOMAP Fsa or automata-lib DFA.')
+
+
+def _dfa_to_nx_graph(dfa: DFA):
+    g = nx.DiGraph()
+    g.add_nodes_from(dfa.states)
+    for u, lookup in dfa.transitions.items():
+        for _, v in lookup.items():
+            g.add_edge(u, v)
+    return g
+
+
+def _create_complete_dfa(dfa: DFA | Fsa) -> DFA | Fsa:
+    if isinstance(dfa, DFA):
+        return dfa.to_complete()
+    if isinstance(dfa, Fsa):
+        dfa_clone = dfa.clone()
+        dfa_clone.add_trap_state()
+        return dfa_clone
+    raise TypeError('Expected a LOMAP Fsa or automata-lib DFA.')
+
+
+def _dfa_edge_labels(dfa: DFA):
+    labels = {}
+    for u, lookup in dfa.transitions.items():
+        for symbol, v in lookup.items():
+            labels.setdefault((u, v), set()).add(symbol)
+    return labels
+
+
 class RuntimeMonitor(object):
     '''Runtime monitor with three-valued verdicts over DFA states.'''
 
-    def __init__(self, dfa: Fsa):
-        self.dfa = dfa
-        self.verdict, self.lookahead = annotate_monitor(dfa)
-        self.state = list(dfa.init.keys())[0]
+    def __init__(self, dfa: Fsa | DFA):
+        self._props = getattr(dfa, "props", None)
+        self.dfa = _as_automata_dfa(dfa)
+        self._annotation_dfa = _as_automata_dfa(_create_complete_dfa(dfa))
+        self._nx_graph = _dfa_to_nx_graph(self._annotation_dfa)
+        self._sccs, self._comp_of, self._dag = _build_scc_dag(self._nx_graph)
+        self.verdict, self.lookahead = annotate_monitor(
+            self._annotation_dfa,
+            precomputed=(self._nx_graph, self._sccs, self._comp_of, self._dag),
+        )
+        self.state = self.dfa.initial_state
         self.dead = False
+
+    def _symbol_to_input(self, symbol):
+        if isinstance(symbol, (set, list, tuple)) and self._props is not None:
+            if not symbol:
+                return 0
+            return reduce(op.or_, [self._props.get(p, 0) for p in symbol], 0)
+        return symbol
 
     def current(self):
         '''Returns a tuple (verdict, lookahead, state).'''
@@ -33,14 +87,14 @@ class RuntimeMonitor(object):
         if self.dead:
             return VERDICT_FALSE, 0
 
-        nxt = self.dfa.next_states_of_fsa(self.state, symbol)
-        assert len(nxt) <= 1, 'Should be deterministic!'
-        if not nxt:
+        sym = self._symbol_to_input(symbol)
+        nxt = self.dfa.transitions.get(self.state, {}).get(sym)
+        if nxt is None:
             self.dead = True
             self.state = None
             return VERDICT_FALSE, 0
 
-        self.state = nxt[0]
+        self.state = nxt
         return (self.verdict.get(self.state, VERDICT_UNKNOWN),
                 self.lookahead.get(self.state, math.inf))
 
@@ -60,7 +114,7 @@ class RuntimeMonitor(object):
         Only `matplotlib` drawing is supported (consistent with other helpers).
         """
         import matplotlib.pyplot as plt
-        g = self.dfa.g
+        g = _dfa_to_nx_graph(self.dfa)
 
         pos = nx.spring_layout(g)
 
@@ -88,7 +142,7 @@ class RuntimeMonitor(object):
         nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=edge_labels)
 
         # Draw an arrow marker for the initial state
-        init = next(iter(self.dfa.init.keys()))
+        init = self.dfa.initial_state
         # compute a marker position slightly left of the node
         node_pos = pos.get(init, (0.0, 0.0))
         try:
@@ -105,6 +159,72 @@ class RuntimeMonitor(object):
         nx.draw_networkx_edges(g, pos=pos_marker, edgelist=[(marker, init)], arrows=True, arrowsize=20)
 
         plt.show()
+
+    def visualize_graphviz(self, path='monitor.png', layout='dot', show_current=False):
+        """Render a Graphviz visualization of the SCC condensation graph.
+
+        Requires pygraphviz. Writes to `path` (e.g. .png or .svg).
+        """
+        try:
+            import pygraphviz as pgv
+        except Exception as exc:
+            raise RuntimeError('pygraphviz is required for visualize_graphviz().') from exc
+
+        g = pgv.AGraph(directed=True, strict=False)
+        g.graph_attr.update(rankdir='LR')
+
+        nx_g = self._nx_graph
+        sccs, comp_of, dag = self._sccs, self._comp_of, self._dag
+
+        current_comp = None
+        if show_current and (not self.dead) and self.state in comp_of:
+            current_comp = comp_of[self.state]
+
+        for cid, states in enumerate(sccs):
+            rep = next(iter(states))
+            v = self.verdict.get(rep, VERDICT_UNKNOWN)
+            la = self.lookahead.get(rep, math.inf)
+            la_str = '∞' if math.isinf(la) else str(int(la))
+            states_label = ', '.join(str(s) for s in sorted(states))
+            label = f"C{cid}\n{v} ({la_str})\n{states_label}"
+
+            if current_comp == cid:
+                fill = 'yellow'
+            elif v == VERDICT_TRUE:
+                fill = 'green'
+            elif v == VERDICT_FALSE:
+                fill = 'red'
+            else:
+                fill = 'lightblue'
+
+            g.add_node(cid, label=label, style='filled', fillcolor=fill)
+
+        for u, v in dag.edges():
+            g.add_edge(u, v)
+
+        for cid, states in enumerate(sccs):
+            internal_symbols = set()
+            for state in states:
+                for symbol, next_state in self._annotation_dfa.transitions.get(state, {}).items():
+                    if comp_of.get(next_state) == cid:
+                        internal_symbols.add(symbol)
+
+            if internal_symbols:
+                if len(internal_symbols) <= 5:
+                    loop_label = ','.join(str(s) for s in sorted(internal_symbols))
+                else:
+                    loop_label = f"{len(internal_symbols)} sym"
+                g.add_edge(cid, cid, label=loop_label, penwidth=1.5)
+
+        init_marker = '__init__'
+        init_comp = comp_of.get(self.dfa.initial_state)
+        if init_comp is not None:
+            g.add_node(init_marker, label='', shape='point', width=0.05, height=0.05)
+            g.add_edge(init_marker, init_comp)
+
+        g.layout(prog=layout)
+        g.draw(path)
+        return path
 
 
 def _build_scc_dag(g):
@@ -124,7 +244,7 @@ def _build_scc_dag(g):
     return sccs, comp_of, dag
 
 
-def annotate_monitor(dfa):
+def annotate_monitor(dfa: Fsa | DFA, precomputed=None):
     '''Annotates each DFA state with a verdict in {T, F, ?} and lookahead.
 
     The annotation follows SCC condensation and reverse topological
@@ -132,10 +252,14 @@ def annotate_monitor(dfa):
     infinite lookahead.
     '''
     # dfa.add_trap_state()
-    g = dfa.g
-    finals = set(dfa.final)
-
-    sccs, comp_of, dag = _build_scc_dag(g)
+    dfa = _create_complete_dfa(dfa)
+    auto_dfa = _as_automata_dfa(dfa)
+    if precomputed is None:
+        g = _dfa_to_nx_graph(auto_dfa)
+        sccs, comp_of, dag = _build_scc_dag(g)
+    else:
+        g, sccs, comp_of, dag = precomputed
+    finals = set(auto_dfa.final_states)
     order = list(nx.topological_sort(dag))
     order.reverse()
 

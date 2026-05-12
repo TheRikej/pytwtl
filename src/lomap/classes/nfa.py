@@ -15,6 +15,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from .fsa import Fsa
+from automata.fa.dfa import DFA
+from automata_bridge import automata_dfa_to_fsa, fsa_to_automata_nfa
 
 
 class Nfa(Fsa):
@@ -55,10 +57,14 @@ class Nfa(Fsa):
 		proposition set ``props``.
 		"""
 		prop_bitmap = self.bitmap_of_props(props)
-		next_states = set()
-		for state in self.epsilon_closure(q):
-			for _, v, d in self.g.out_edges(state, data=True):
-				inputs = self._edge_input_symbols(d)
-				if prop_bitmap in inputs:
-					next_states.update(self.epsilon_closure({v}))
+		auto_nfa = fsa_to_automata_nfa(self)
+		lambda_closures = auto_nfa._get_lambda_closures()
+		current_states = lambda_closures.get(q, frozenset([q]))
+		next_states = auto_nfa._get_next_current_states(current_states, prop_bitmap)
 		return list(next_states)
+
+	def determinize(self):
+		"""Determinize the NFA using automata-lib subset construction."""
+		auto_nfa = fsa_to_automata_nfa(self)
+		auto_dfa = DFA.from_nfa(auto_nfa, minify=False)
+		return automata_dfa_to_fsa(auto_dfa, self.props, template=self)
