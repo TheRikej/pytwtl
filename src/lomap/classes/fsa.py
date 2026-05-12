@@ -19,6 +19,7 @@ import copy
 import networkx as nx
 import re
 import subprocess as sp
+from collections import deque
 import itertools as it
 import operator as op
 from lomap.classes.model import Model
@@ -350,10 +351,10 @@ Edges: {edges}
 		Adds a trap state and completes the automaton. Returns True whenever a
 		trap state has been added to the automaton.
 		"""
+		trap_added = False #self.g.has_node('trap')
+		true_sink_added = False #self.g.has_node('true_sink')
 		self.g.add_node('trap')
 		self.g.add_node('true_sink')
-		trap_added = False
-		true_sink_added = False
 		for s in self.g.nodes():
 			rem_alphabet = set(self.alphabet)
 			for _, _, d in self.g.out_edges(s, data=True):
@@ -366,6 +367,7 @@ Edges: {edges}
 				if not true_sink_added: #'trap' not in self.g:
 					self.g.add_edge('true_sink', 'true_sink', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': TrueRule()})
 					true_sink_added = True
+					self.final.add('true_sink')
 				self.g.add_edge(s,'true_sink', **{'weight': 0, 'input': rem_alphabet, 'guard': 'true_sink_guard', 'label': ElseRule()})
 
 			
@@ -415,6 +417,47 @@ Edges: {edges}
 		"""
 		return self.alphabet.difference(self.symbols_w_prop(prop))
 
+	def _normalize_state_set(self, states):
+		"""
+		Normalizes a state or a collection of states to a set.
+		"""
+		if isinstance(states, (set, frozenset)):
+			return set(states)
+		return set([states])
+
+	def _edge_input_symbols(self, data):
+		"""
+		Returns the set of input symbols attached to an edge.
+		Epsilon edges are represented by the ``epsilon`` attribute or an empty
+		input set.
+		"""
+		if data.get('epsilon', False):
+			return set()
+		inputs = data.get('input', set())
+		if inputs is None:
+			return set()
+		if isinstance(inputs, (set, frozenset, list, tuple)):
+			return set(inputs)
+		return set([inputs])
+
+	def epsilon_closure(self, states):
+		"""
+		Returns the epsilon-closure of the given state or set of states.
+		For deterministic FSAs without epsilon transitions this is just the
+		input state set.
+		"""
+		closure = self._normalize_state_set(states)
+		stack = list(closure)
+		while stack:
+			state = stack.pop()
+			for _, next_state, data in self.g.out_edges(state, data=True):
+				if not data.get('epsilon', False) and self._edge_input_symbols(data):
+					continue
+				if next_state not in closure:
+					closure.add(next_state)
+					stack.append(next_state)
+		return closure
+
 
 	def bitmap_of_props(self, props):
 		"""
@@ -431,4 +474,73 @@ Edges: {edges}
 		# Return an array of next states
 		return [v for _, v, d in self.g.out_edges(q, data=True)
 												   if prop_bitmap in d['input']]
+
+	def determinize(self):
+		"""
+		Determinizes the automaton using subset construction.
+
+		The method supports epsilon transitions encoded by an edge attribute
+		``epsilon=True`` or by an empty ``input`` set.
+		"""
+		det = Fsa(self.props, self.directed, False)
+		det.name = 'Determinized %s' % self.name
+		det.props = dict(self.props)
+		det.alphabet = set(self.alphabet)
+
+		if not self.init:
+			return det
+
+		start_subset = frozenset(self.epsilon_closure(set(self.init.keys())))
+		if not start_subset:
+			return det
+
+		subset_to_state = {start_subset: 0}
+		state_to_subset = [start_subset]
+		det.init[0] = 1
+		det.g.add_node(0, subset=start_subset)
+		if start_subset & self.final:
+			det.final.add(0)
+
+		stack = deque([start_subset])
+		while stack:
+			current_subset = stack.pop()
+			current_state = subset_to_state[current_subset]
+
+			transitions = dict()
+			for state in current_subset:
+				for _, next_state, data in self.g.out_edges(state, data=True):
+					inputs = self._edge_input_symbols(data)
+					if not inputs:
+						continue
+					for symbol in inputs:
+						if symbol not in transitions:
+							transitions[symbol] = set()
+						transitions[symbol].add(next_state)
+
+			destinations = dict()
+			for symbol, next_states in transitions.items():
+				next_subset = frozenset(self.epsilon_closure(next_states))
+				if next_subset not in destinations:
+					destinations[next_subset] = set()
+				destinations[next_subset].add(symbol)
+
+			for next_subset, symbols in destinations.items():
+				if next_subset not in subset_to_state:
+					next_state = len(state_to_subset)
+					subset_to_state[next_subset] = next_state
+					state_to_subset.append(next_subset)
+					det.g.add_node(next_state, subset=next_subset)
+					if next_subset & self.final:
+						det.final.add(next_state)
+					stack.append(next_subset)
+				else:
+					next_state = subset_to_state[next_subset]
+
+				det.g.add_edge(current_state, next_state,
+								 weight=0,
+								 input=symbols,
+								 guard=str(symbols),
+								 label=str(symbols))
+
+		return det
 

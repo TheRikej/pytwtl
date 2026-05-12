@@ -57,7 +57,7 @@ class Model(object):
 	def size(self):
 		return (self.g.number_of_nodes(), self.g.number_of_edges())
 
-	def visualize(self, edgelabel=None, draw='pygraphviz'):
+	def visualize(self, edgelabel=None, draw='matplotlib'):
 		"""
 		Visualizes a LOMAP system model
 		"""
@@ -78,3 +78,4 @@ class Model(object):
 		else:
 			raise ValueError('Expected parameter draw to be either:'
 							 + '"pygraphviz" or "matplotlib"!')
+		

@@ -145,7 +145,7 @@ def test_within_normal_dispatches_to_repeat():
 
 def test_eventually_adds_prefix_states_for_low_and_else_transitions():
     phi = hold(PROPS, 'A', duration=0)
-    dfa = eventually(phi, low=2, high=5)
+    dfa = eventually(phi, low=2)
     assert dfa.tree.operation == Op.event
     assert dfa.g.number_of_nodes() >= phi.g.number_of_nodes() + 2
 
@@ -181,7 +181,7 @@ def test_public_combinators_return_fsa_instances_where_successful():
 
     i = intersection(a, b)
     u = union(hold(PROPS, 'A', duration=0), hold(PROPS, 'B', duration=0))
-    e = eventually(hold(PROPS, 'A', duration=0), low=0, high=2)
+    e = eventually(hold(PROPS, 'A', duration=0), low=0)
 
     assert isinstance(i, Fsa)
     assert isinstance(u, Fsa)
@@ -304,7 +304,7 @@ def test_intersection_of_complements_matches_not_a_and_not_b():
 
 def test_eventually_allows_retry_until_formula_satisfied():
     phi = hold(PROPS, 'A', duration=1)
-    dfa = eventually(phi, low=0, high=4)
+    dfa = eventually(phi, low=0)
     assert _accepts(dfa, [{'B'}, {'A'}, {'A'}]) is True
     assert _accepts(dfa, [{'B'}, {'A'}, {'B'}, {'A'}, {'A'}]) is True
     assert _accepts(dfa, [{'B'}, {'A'}, {'B'}]) is False
@@ -312,15 +312,15 @@ def test_eventually_allows_retry_until_formula_satisfied():
 
 def test_eventually_with_low_prefix_requires_additional_steps_before_formula():
     phi = hold(PROPS, 'A', duration=0)
-    dfa = eventually(phi, low=2, high=4)
+    dfa = eventually(phi, low=2)
     assert _accepts(dfa, [{'B'}, {'C'}, {'A'}]) is True
     assert _accepts(dfa, [{'A'}]) is False
     assert _accepts(dfa, [{'B'}, {'A'}]) is False
 
 
 def test_eventually_tree_flags_for_nested_eventually_source():
-    first = eventually(hold(PROPS, 'A', duration=0), low=0, high=2)
-    second = eventually(first, low=1, high=5)
+    first = eventually(hold(PROPS, 'A', duration=0), low=0)
+    second = eventually(first, low=1)
     assert second.tree.operation == Op.event
     assert second.tree.unr is False
     assert second.tree.wwf is False
@@ -331,9 +331,10 @@ def test_edge_label_rule_types_for_intersection_and_eventually():
     labels = [d['label'] for _, _, d in i.g.edges(data=True)]
     assert any(isinstance(lbl, AndRule) for lbl in labels)
 
-    e = eventually(hold(PROPS, 'A', duration=0), low=0, high=2)
+    e = eventually(hold(PROPS, 'A', duration=0), low=0)
     labels_e = [d['label'] for _, _, d in e.g.edges(data=True)]
-    assert any(isinstance(lbl, ElseRule) for lbl in labels_e)
+    assert labels_e
+    assert all('epsilon' not in d for _, _, d in e.g.edges(data=True))
 
 
 def test_accept_prop_boolean_labels_match_expected_rule_types():
@@ -360,6 +361,6 @@ def test_union_and_intersection_output_guards_are_nonempty_strings():
 
 def test_composed_automata_multiple_operations_remain_deterministic_from_init():
     left = union(hold(PROPS, 'A', duration=0), hold(PROPS, 'B', duration=0))
-    right = eventually(hold(PROPS, 'C', duration=0), low=0, high=3)
+    right = eventually(hold(PROPS, 'C', duration=0), low=0)
     prod = intersection(left, right)
     assert len(prod.init) == 1

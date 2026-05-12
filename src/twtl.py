@@ -29,7 +29,7 @@ import logging
 import itertools as it
 
 from lomap.classes.fsa import Fsa
-from dfa import setDFAType, DFAType, Op, setOptimizationFlag
+from dfa import minimize_dfa, setDFAType, DFAType, Op, setOptimizationFlag
 from runtime_monitor import RuntimeMonitor
 from util import _debug_pprint_tree
 
@@ -90,6 +90,7 @@ def monitor_runtime(formula=None, kind=None, dfa:Fsa|None=None):
         if kind is None:
             kind = DFAType.Infinity
         _, dfa = translate(formula, kind=kind)
+    dfa = minimize_dfa(dfa)
     return RuntimeMonitor(dfa)
 
 def _init_tree(tree):

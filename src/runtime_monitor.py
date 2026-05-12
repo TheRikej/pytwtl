@@ -131,6 +131,7 @@ def annotate_monitor(dfa):
     propagation. Cyclic multi-state SCCs are marked as inconclusive with
     infinite lookahead.
     '''
+    # dfa.add_trap_state()
     g = dfa.g
     finals = set(dfa.final)
 

@@ -37,7 +37,7 @@ from io import StringIO
 
 import networkx as nx
 
-from lomap import Fsa
+from lomap import Fsa, Nfa
 
 
 class DFAType(object):
@@ -533,7 +533,7 @@ def hold(props: list[str], prop: str, duration: int, negation:bool=False, boolea
 
 def complement(dfa: Fsa) -> Fsa:
     # Ensure total transition function before complementing.
-    # dfa.add_trap_state()
+    dfa.add_trap_state()
     dfa.final = set(dfa.g.nodes()) - set(dfa.final)
     return dfa
 
@@ -550,7 +550,7 @@ def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     assert dfa1.props == dfa2.props
     assert dfa1.alphabet == dfa2.alphabet
     assert len(dfa1.init) == 1 and len(dfa2.init) == 1
-    assert len(dfa1.final) == 1 and len(dfa2.final) == 1
+    # assert len(dfa1.final) == 1 and len(dfa2.final) == 1
     
     dfa = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
     dfa.name = '(Concat {} {} )'.format(dfa1.name, dfa2.name)
@@ -560,6 +560,14 @@ def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     relabel_dfa(dfa1, start=0)
     init2 = next(iter(dfa2.init.keys()))
     final1 = iter(dfa1.final).__next__()
+    marked_pairs = []
+    for u, v in dfa1.g.edges():
+        if u in dfa1.final:
+            marked_pairs.append((u, v))
+    for u, v in marked_pairs:
+        dfa1.g.remove_edge(u, v)
+    relabel_dfa(dfa1, {u: final1 for u in dfa1.final}, start=0)
+
     relabel_dfa(dfa2, mapping={init2: final1}, start=dfa1.g.number_of_nodes())
     assert len(set(dfa1.g.nodes()) & set(dfa2.g.nodes())) == 1
     dfa.g.add_edges_from(dfa1.g.edges(data=True))
@@ -569,15 +577,8 @@ def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     dfa.init = dict(dfa1.init)
     dfa.final = set(dfa2.final)
     
-    if getDFAType() == DFAType.Infinity:
-        mark_concatenation(dfa1, dfa2, dfa)
-    elif getDFAType() == DFAType.Normal:
-        # minimize the DFA
-        dfa = minimize_dfa(dfa)
-    else:
-        raise ValueError('DFA type must be either DFAType.Normal or ' +
-                         'DFAType.Infinity! {} was given!'.format(getDFAType()))
-    
+    dfa = minimize_dfa(dfa)
+
     logger.debug('[concatenation] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
     return dfa
 
@@ -831,35 +832,44 @@ def eventually(phi_dfa: Fsa, low: int) -> Fsa:
     NOTE: Assumes that phi_dfa contains no ``trap'' states, i.e. states which do
     not reach a final state. 
     '''
-    dfa = phi_dfa.clone()
-    dfa.name = '(Eventually {} {})'.format(phi_dfa.name, low)
-    
-    init = next(iter(dfa.init.keys())) #TODO change init to single state
-    for state in dfa.g.nodes():
-        bitmaps = set()
-        guard = '(else)'
-        label = ElseRule()
-        for _, _, d in dfa.g.out_edges(state, data=True):
-            bitmaps |= d['input']
-        bitmaps = dfa.alphabet - bitmaps
-        
-        if state not in dfa.final and bitmaps:
-            attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
-            dfa.g.add_edge(state, init, **attr_dict)
-    
+    nfa = Nfa(phi_dfa.props, phi_dfa.directed, True)
+    nfa.name = '(Eventually {} {})'.format(phi_dfa.name, low)
+    nfa.g = nx.MultiDiGraph(phi_dfa.g)
+    nfa.init = dict(phi_dfa.init)
+    nfa.final = set(phi_dfa.final)
+    if hasattr(phi_dfa, 'tree'):
+        nfa.tree = copy.deepcopy(phi_dfa.tree)
+    if hasattr(phi_dfa, 'kind'):
+        nfa.kind = phi_dfa.kind
+
+    init = next(iter(nfa.init.keys())) #TODO change init to single state
+    original_states = list(nfa.g.nodes())
+
     # add states to accept a prefix word of any symbol of length low
     if low > 0:
         guard = '(1)'
         label = TrueRule()
-        bitmaps = dfa.get_guard_bitmap(guard)
-        nodes = [i for i in range(dfa.g.number_of_nodes(), dfa.g.number_of_nodes()+low)]
+        bitmaps = nfa.get_guard_bitmap(guard)
+        nodes = [i for i in range(nfa.g.number_of_nodes(), nfa.g.number_of_nodes()+low)]
         attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
-        nx.add_path(dfa.g, nodes, **attr_dict)
-        dfa.g.add_edge(nodes[-1], init, **attr_dict)
-        dfa.init = {nodes[0] : 1}
-    
-    # add counter annotation
-    mark_eventually(phi_dfa, dfa, low)
+        nx.add_path(nfa.g, nodes, **attr_dict)
+        nfa.g.add_edge(nodes[-1], init, **attr_dict)
+        nfa.init = {nodes[0] : 1}
+
+    # every original non-final state can restart matching on a miss, and every
+    # original state can also restart via an epsilon transition before the next
+    # symbol is consumed.
+    for state in original_states:
+        nfa.add_epsilon_transition(state, init)
+
+        # if state not in nfa.final:
+        #     bitmaps = nfa.alphabet - set()
+        #     attr_dict = {'weight': 0, 'input': bitmaps, 'guard': '(else)', 'label': ElseRule()}
+        #     nfa.g.add_edge(state, init, **attr_dict)
+
+    dfa = nfa.determinize()
+    if hasattr(phi_dfa, 'tree'):
+        mark_eventually(phi_dfa, dfa, low)
     logger.debug('[eventually] Low: {} DFA: {}'.format(low, phi_dfa.name))
     return dfa
 
@@ -931,7 +941,7 @@ def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
         dfa.init = {nodes[0] : 1}
     
     logger.debug('[within] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
-    return dfa
+    return minimize_dfa(dfa)
 
 def truncate_dfa(dfa: Fsa, cutoff: int) -> Fsa:
     '''Returns a dfa which accepts only the words of length at most cutoff from

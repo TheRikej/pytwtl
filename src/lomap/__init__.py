@@ -19,6 +19,7 @@ from lomap.classes.ts import Ts
 from lomap.classes.markov import Markov
 from lomap.classes.buchi import Buchi
 from lomap.classes.fsa import Fsa
+from lomap.classes.nfa import Nfa
 from lomap.classes.timer import Timer
 from lomap.algorithms.product import *
 # from lomap.algorithms.optimal_run import optimal_run

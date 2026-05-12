@@ -154,12 +154,12 @@ class _DfaVisitor(TwtlVisitor):
         return complement(dfa) if ctx.NOT() is not None else dfa
 
     def visitAtom(self, ctx):
-        if ctx.PROP() is not None:
-            return accept_prop(self.props, prop=ctx.PROP().getText())
-        if ctx.TRUE() is not None:
-            return accept_prop(self.props, boolean=True)
-        if ctx.FALSE() is not None:
-            return accept_prop(self.props, boolean=False)
+        # if ctx.PROP() is not None:
+        #     return accept_prop(self.props, prop=ctx.PROP().getText())
+        # if ctx.TRUE() is not None:
+        #     return accept_prop(self.props, boolean=True)
+        # if ctx.FALSE() is not None:
+        #     return accept_prop(self.props, boolean=False)
         return self.visit(ctx.formula())
 
 
