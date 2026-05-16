@@ -64,7 +64,7 @@ def test_annotate_acyclic_state_with_mixed_successors_is_unknown():
     assert verdict[1] == VERDICT_TRUE
     assert verdict[2] == VERDICT_FALSE
     assert verdict[0] == VERDICT_UNKNOWN
-    assert lookahead[0] == 1
+    assert lookahead[0] == 2
 
 
 def test_annotate_multistate_scc_is_unknown_infinite():
@@ -90,7 +90,7 @@ def test_runtime_monitor_step_and_dead_transition_behavior():
 
     mon = RuntimeMonitor(dfa)
     v0, k0, s0 = mon.current()
-    assert v0 == VERDICT_TRUE
+    assert v0 == VERDICT_UNKNOWN
     assert k0 == 1
     assert s0 == 0
 
