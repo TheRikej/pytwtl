@@ -299,7 +299,7 @@ Transitions: {transitions}
 
 		return eval(guard)
 
-	def add_trap_state(self):
+	def 	add_trap_state(self):
 		"""
 		Adds a trap state and completes the automaton. Returns True whenever a
 		trap state has been added to the automaton.

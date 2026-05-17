@@ -539,14 +539,18 @@ def hold(props: list[str], prop: str, duration: int, negation:bool=False, boolea
 def complement(dfa: Fsa) -> Fsa:
     """Complements the DFA using automata-lib while preserving Fsa wrapper."""
     try:
-        auto_dfa = dfa.to_automata_dfa()
-        comp_auto = auto_dfa.complement(minify=False)
+        auto_dfa = dfa.to_automata_dfa().to_complete()
+        # comp_auto = auto_dfa.complement(minify=False)
+        comp_auto = AutoDFA(
+            states=auto_dfa.states,
+            input_symbols=auto_dfa.input_symbols,
+            transitions=auto_dfa.transitions,
+            initial_state=auto_dfa.initial_state,
+            final_states=set(auto_dfa.states) - set(auto_dfa.final_states) - set([auto_dfa.initial_state]),
+            allow_partial=True,
+        )
         comp_fsa = Fsa.from_automata_dfa(comp_auto, dfa.props, template=dfa)
-        dfa._sync_from_auto(comp_auto)
-        dfa.init = comp_fsa.init
-        dfa.final = comp_fsa.final
-        dfa.alphabet = comp_fsa.alphabet
-        return dfa
+        return comp_fsa
     except Exception as exc:
         logger.warning('[complement] automata-lib complement failed (%s). Falling back to trap-state complement.', exc)
         dfa.add_trap_state()
@@ -618,9 +622,7 @@ def intersection(dfa1: Fsa, dfa2: Fsa) -> Fsa:
 
     auto1 = _auto_from_fsa(dfa1)
     auto2 = _auto_from_fsa(dfa2)
-    auto_int = auto1.intersection(
-        auto2
-    )
+    auto_int = auto1.intersection(auto2)
     dfa = _fsa_from_auto(auto_int, template)
 
     # if getDFAType() == DFAType.Infinity and hasattr(dfa1, 'tree') and hasattr(dfa2, 'tree'):
@@ -731,103 +733,104 @@ def eventually(phi_dfa: Fsa, low: int) -> Fsa:
     logger.debug('[eventually] Low: {} DFA: {}'.format(low, phi_dfa.name))
     return dfa
 
-def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
-    '''Creates a DFA which accepts the language associated with a within
-    operator which encloses the formula corresponding to phi_dfa.
-    '''
-    assert len(phi_dfa.init) == 1
-    # assert len(phi_dfa.final) == 1
+# def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
+#     '''Creates a DFA which accepts the language associated with a within
+#     operator which encloses the formula corresponding to phi_dfa.
+#     '''
+#     assert len(phi_dfa.init) == 1
+#     # assert len(phi_dfa.final) == 1
     
-    auto_phi = _auto_from_fsa(phi_dfa)
-    init_state = auto_phi.initial_state
-    if len(auto_phi.final_states) != 1:
-        raise ValueError('repeat() expects exactly one final state')
-    final_state = next(iter(auto_phi.final_states))
+#     final_state = phi_dfa.unify_accepting_states()
+#     auto_phi = _auto_from_fsa(phi_dfa)
+#     init_state = auto_phi.initial_state
+#     if len(auto_phi.final_states) != 1:
+#         raise ValueError('repeat() expects exactly one final state')
+#     #  = next(iter(auto_phi.final_states))
 
-    transitions = {state: dict(auto_phi.transitions.get(state, {})) for state in auto_phi.states}
-    b = _shortest_path_length(transitions, init_state, final_state)
-    d = high - low - b + 2
+#     transitions = {state: dict(auto_phi.transitions.get(state, {})) for state in auto_phi.states}
+#     b = _shortest_path_length(transitions, init_state, final_state)
+#     d = high - low - b + 2
 
-    input_symbols = set(auto_phi.input_symbols)
-    combined_transitions = {}
-    combined_states = set()
-    inits = []
-    final_marker = ('final',)
+#     input_symbols = set(auto_phi.input_symbols)
+#     combined_transitions = {}
+#     combined_states = set()
+#     inits = []
+#     final_marker = ('final',)
 
-    for k in range(d):
-        mapping = {state: (k, state) for state in auto_phi.states}
-        mapping[final_state] = final_marker
+#     for k in range(d):
+#         mapping = {state: (k, state) for state in auto_phi.states}
+#         mapping[final_state] = final_marker
 
-        copy_states = set(mapping.values())
-        copy_transitions = {state: {} for state in copy_states}
-        for src, lookup in transitions.items():
-            for sym, dst in lookup.items():
-                copy_transitions[mapping[src]][sym] = mapping[dst]
+#         copy_states = set(mapping.values())
+#         copy_transitions = {state: {} for state in copy_states}
+#         for src, lookup in transitions.items():
+#             for sym, dst in lookup.items():
+#                 copy_transitions[mapping[src]][sym] = mapping[dst]
 
-        auto_copy = AutoDFA(
-            states=copy_states,
-            input_symbols=input_symbols,
-            transitions=copy_transitions,
-            initial_state=mapping[init_state],
-            final_states={final_marker},
-            allow_partial=True,
-        )
-        auto_copy = _truncate_auto_dfa(auto_copy, cutoff=(high - low + 1) - k)
+#         auto_copy = AutoDFA(
+#             states=copy_states,
+#             input_symbols=input_symbols,
+#             transitions=copy_transitions,
+#             initial_state=mapping[init_state],
+#             final_states={final_marker},
+#             allow_partial=True,
+#         )
+#         auto_copy = _truncate_auto_dfa(auto_copy, cutoff=(high - low + 1) - k)
 
-        combined_states |= set(auto_copy.states)
-        for src, lookup in auto_copy.transitions.items():
-            combined_transitions.setdefault(src, {})
-            combined_transitions[src].update(lookup)
-        inits.append(auto_copy.initial_state)
+#         combined_states |= set(auto_copy.states)
+#         for src, lookup in auto_copy.transitions.items():
+#             combined_transitions.setdefault(src, {})
+#             combined_transitions[src].update(lookup)
+#         inits.append(auto_copy.initial_state)
 
-    combined_states.add(final_marker)
+#     combined_states.add(final_marker)
 
-    # create restart transitions
-    current_states = set([inits[0]])
-    for rstate in inits[1:]:
-        next_states = set()
-        for state in current_states:
-            outgoing = combined_transitions.get(state, {})
-            next_states.update(outgoing.values())
-            missing = input_symbols - set(outgoing.keys())
-            if state != final_marker and missing:
-                combined_transitions.setdefault(state, {})
-                for sym in missing:
-                    combined_transitions[state][sym] = rstate
-        current_states = next_states | set([rstate])
+#     # create restart transitions
+#     current_states = set([inits[0]])
+#     for rstate in inits[1:]:
+#         next_states = set()
+#         for state in current_states:
+#             outgoing = combined_transitions.get(state, {})
+#             next_states.update(outgoing.values())
+#             missing = input_symbols - set(outgoing.keys())
+#             if state != final_marker and missing:
+#                 combined_transitions.setdefault(state, {})
+#                 for sym in missing:
+#                     combined_transitions[state][sym] = rstate
+#         current_states = next_states | set([rstate])
 
-    initial_state = inits[0]
-    if low > 0:
-        prefix_states = [('prefix', i) for i in range(low)]
-        combined_states.update(prefix_states)
-        for i, state in enumerate(prefix_states):
-            combined_transitions.setdefault(state, {})
-            next_state = prefix_states[i + 1] if i + 1 < low else initial_state
-            for sym in input_symbols:
-                combined_transitions[state][sym] = next_state
-        initial_state = prefix_states[0]
+#     initial_state = inits[0]
+#     if low > 0:
+#         prefix_states = [('prefix', i) for i in range(low)]
+#         combined_states.update(prefix_states)
+#         for i, state in enumerate(prefix_states):
+#             combined_transitions.setdefault(state, {})
+#             next_state = prefix_states[i + 1] if i + 1 < low else initial_state
+#             for sym in input_symbols:
+#                 combined_transitions[state][sym] = next_state
+#         initial_state = prefix_states[0]
 
-    for state in combined_states:
-        combined_transitions.setdefault(state, {})
+#     for state in combined_states:
+#         combined_transitions.setdefault(state, {})
 
-    auto_repeat = AutoDFA(
-        states=combined_states,
-        input_symbols=input_symbols,
-        transitions=combined_transitions,
-        initial_state=initial_state,
-        final_states={final_marker},
-        allow_partial=True,
-    )
-    if getDFAType() == DFAType.Normal:
-        auto_repeat = auto_repeat.minify(retain_names=False)
+#     auto_repeat = AutoDFA(
+#         states=combined_states,
+#         input_symbols=input_symbols,
+#         transitions=combined_transitions,
+#         initial_state=initial_state,
+#         final_states={final_marker},
+#         allow_partial=True,
+#     )
+#     if getDFAType() == DFAType.Normal:
+#         auto_repeat = auto_repeat.minify(retain_names=False)
 
-    template = Fsa(phi_dfa.props, phi_dfa.directed, phi_dfa.multi)
-    template.name = '(Repeat {} {} {} )'.format(phi_dfa.name, low, high)
-    dfa = _fsa_from_auto(auto_repeat, template)
-    dfa.unify_accepting_states()
-    relabel_dfa(dfa)
-    logger.debug('[within] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
-    return dfa
+#     template = Fsa(phi_dfa.props, phi_dfa.directed, phi_dfa.multi)
+#     template.name = '(Repeat {} {} {} )'.format(phi_dfa.name, low, high)
+#     dfa = _fsa_from_auto(auto_repeat, template)
+#     dfa.unify_accepting_states()
+#     relabel_dfa(dfa)
+#     logger.debug('[within] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
+#     return dfa
 
 def truncate_dfa(dfa: Fsa, cutoff: int) -> Fsa:
     '''Returns a dfa which accepts only the words of length at most cutoff from
@@ -846,3 +849,35 @@ def truncate_dfa(dfa: Fsa, cutoff: int) -> Fsa:
     dfa.final = updated.final
     dfa.alphabet = updated.alphabet
     return dfa
+
+
+def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
+    '''Creates a DFA which accepts the language associated with a within
+    operator which encloses the formula corresponding to phi_dfa.
+    '''
+    assert len(phi_dfa.init) == 1
+    # assert len(phi_dfa.final) == 1
+    
+    template = Fsa(phi_dfa.props, phi_dfa.directed, False)
+
+    dfa_f = eventually(phi_dfa, 0)
+    
+    hold_dfa = hold(phi_dfa.props, None, high - low + 1, boolean=True)
+    line = complement(hold_dfa)
+
+    dfa = _auto_from_fsa(dfa_f).intersection(_auto_from_fsa(line))
+    template = Fsa(phi_dfa.props, phi_dfa.directed, phi_dfa.multi)
+    template.name = '(Repeat {} {} {} )'.format(phi_dfa.name, low, high)
+
+    base_fsa = _fsa_from_auto(dfa, template)
+
+    if low > 0:
+        prefix_dfa = hold(phi_dfa.props, None, low - 1, boolean=True)
+        final = concatenation(prefix_dfa, base_fsa)
+    else:
+        final = base_fsa
+
+    final.unify_accepting_states()
+    relabel_dfa(dfa_f)
+    logger.debug('[within] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
+    return final

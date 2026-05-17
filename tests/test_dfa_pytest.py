@@ -77,11 +77,12 @@ def test_hold_with_and_without_negation():
 
 def test_complement_flips_final_set_against_graph_nodes():
     dfa = hold(PROPS, 'A', duration=1)
+    dfa.add_trap_state()
     before = set(dfa.final)
 
-    complement(dfa)
+    dfa = complement(dfa)
     all_nodes_after = set(dfa.states)
-    assert set(dfa.final) == (all_nodes_after - before)
+    assert set(dfa.final) == (all_nodes_after - before - set(dfa.init))
 
 
 def test_concatenation_builds_dfa():
@@ -130,6 +131,16 @@ def test_within_normal_dispatches_to_repeat():
     assert isinstance(dfa, Fsa)
     assert len(dfa.init) == 1
     assert len(dfa.final) == 1
+
+
+def test_within_with_low_prefix_requires_additional_steps_before_formula():
+    phi = hold(PROPS, 'A', duration=0)
+    dfa = within(phi, low=2, high=3)
+    # must see two prefix steps before the obligation can be satisfied
+    assert _accepts(dfa, [{'B'}, {'C'}, {'A'}]) is True
+    assert _accepts(dfa, [{'A'}]) is False
+    assert _accepts(dfa, [{'B'}, {'A'}]) is False
+    assert _accepts(dfa, [{'B'}, {'C'}, {'D'}, {'B'}]) is False
 
 
 def test_eventually_adds_prefix_states_for_low_and_else_transitions():
