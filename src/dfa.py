@@ -37,8 +37,9 @@ from io import StringIO
 
 import networkx as nx
 
-from lomap import Fsa, Nfa
-from automata_bridge import automata_dfa_to_fsa, fsa_to_automata_dfa
+from automata.fa.dfa import DFA as AutoDFA
+from automata.fa.nfa import NFA as AutoNFA
+from lomap import Fsa
 
 
 class DFAType(object):
@@ -284,14 +285,20 @@ def mark_product(dfa_src1: Fsa, dfa_src2: Fsa, dfa_dest: Fsa, operation:int, cho
     subtrees are copied from the source automata `dfa_src1` and `dfa_src2`.
     '''
     # relabel data in left tree
-    mapping = dict([(u, []) for u in dfa_src1.g.nodes()])
-    for u, v in dfa_dest.g.nodes():
+    mapping = dict([(u, []) for u in dfa_src1.states])
+    for state in dfa_dest.states:
+        if not isinstance(state, tuple) or len(state) != 2:
+            continue
+        u, v = state
         if u in mapping:
             mapping[u].append((u, v))
     # dfa_src1.tree.relabel(mapping, expand=True)
     # relabel data in right tree
-    mapping = dict([(v, []) for v in dfa_src2.g.nodes()])
-    for u, v in dfa_dest.g.nodes():
+    mapping = dict([(v, []) for v in dfa_src2.states])
+    for state in dfa_dest.states:
+        if not isinstance(state, tuple) or len(state) != 2:
+            continue
+        u, v = state
         if v in mapping:
             mapping[v].append((u, v))
     dfa_src2.tree.relabel(mapping, expand=True)
@@ -322,7 +329,7 @@ def relabel_dfa(dfa: Fsa, mapping:dict|None=None, start=0, copy=False):
     if mapping is None: # default mapping
         mapping = dict()
     keys = mapping.keys()
-    nodes = [u for u in dfa.g.nodes() if u not in keys]
+    nodes = [u for u in dfa.states if u not in keys]
     mapping.update(dict(zip(nodes, it.count(start))))
     
     if copy: # create new dfa
@@ -330,13 +337,101 @@ def relabel_dfa(dfa: Fsa, mapping:dict|None=None, start=0, copy=False):
         ret.name = str(dfa.name)
     else: # in-place relabeling
         ret = dfa
-    # relabel state, inital state and set of final states
-    ret.g = nx.relabel_nodes(dfa.g, mapping=mapping, copy=True)
-    ret.init = dict([(mapping[u], 1) for u in dfa.init.keys()])
-    ret.final = set([mapping[u] for u in dfa.final])
+    transitions = {state: dict(lookup) for state, lookup in dfa.transitions.items()}
+    new_states = set(mapping.values())
+    new_transitions = {mapping[state]: {} for state in dfa.states}
+    for src, lookup in transitions.items():
+        for sym, dst in lookup.items():
+            new_transitions[mapping[src]][sym] = mapping[dst]
+    old_init = next(iter(dfa.init.keys())) if dfa.init else None
+    new_init = mapping.get(old_init, next(iter(new_states))) if new_states else None
+    ret._sync_from_auto(AutoDFA(
+        states=new_states,
+        input_symbols=set(dfa.alphabet),
+        transitions=new_transitions,
+        initial_state=new_init,
+        final_states=set([mapping[u] for u in dfa.final]),
+        allow_partial=True,
+    ))
     # copy tree
     copy_tree(dfa, ret, mapping=mapping)
     return ret
+
+
+def _auto_from_fsa(dfa: Fsa) -> AutoDFA:
+    return dfa.to_automata_dfa()
+
+
+def _fsa_from_auto(auto_dfa: AutoDFA, template: Fsa) -> Fsa:
+    return Fsa.from_automata_dfa(auto_dfa, template.props, template=template)
+
+
+def _shortest_path_length(transitions: dict, source, target):
+    if source == target:
+        return 0
+    visited = set([source])
+    frontier = [(source, 0)]
+    while frontier:
+        state, dist = frontier.pop(0)
+        for _, nxt in transitions.get(state, {}).items():
+            if nxt == target:
+                return dist + 1
+            if nxt not in visited:
+                visited.add(nxt)
+                frontier.append((nxt, dist + 1))
+    raise nx.NetworkXNoPath
+
+
+def _truncate_auto_dfa(auto_dfa: AutoDFA, cutoff: int) -> AutoDFA:
+    transitions = {state: dict(auto_dfa.transitions.get(state, {})) for state in auto_dfa.states}
+    visited = set([auto_dfa.initial_state])
+    frontier = [(auto_dfa.initial_state, 0)]
+    kept_edges = set()
+
+    while frontier:
+        state, depth = frontier.pop(0)
+        if depth >= cutoff:
+            continue
+        for sym, nxt in transitions.get(state, {}).items():
+            kept_edges.add((state, sym, nxt))
+            if nxt not in visited:
+                visited.add(nxt)
+                frontier.append((nxt, depth + 1))
+
+    kept_states = set([auto_dfa.initial_state]) | {dst for _, _, dst in kept_edges} | {src for src, _, _ in kept_edges}
+    new_transitions = {state: {} for state in kept_states}
+    for src, sym, dst in kept_edges:
+        if src in new_transitions and dst in kept_states:
+            new_transitions[src][sym] = dst
+
+    # remove states which do not reach a final state
+    reverse = {state: set() for state in kept_states}
+    for src, lookup in new_transitions.items():
+        for _, dst in lookup.items():
+            reverse.setdefault(dst, set()).add(src)
+    reachable = set()
+    stack = list(auto_dfa.final_states & kept_states)
+    while stack:
+        state = stack.pop()
+        if state in reachable:
+            continue
+        reachable.add(state)
+        stack.extend(reverse.get(state, set()))
+    kept_states &= reachable | {auto_dfa.initial_state}
+
+    new_transitions = {
+        state: {sym: dst for sym, dst in new_transitions.get(state, {}).items() if dst in kept_states}
+        for state in kept_states
+    }
+
+    return AutoDFA(
+        states=kept_states,
+        input_symbols=set(auto_dfa.input_symbols),
+        transitions=new_transitions,
+        initial_state=auto_dfa.initial_state,
+        final_states=set(auto_dfa.final_states) & kept_states,
+        allow_partial=True,
+    )
 
 
 
@@ -346,9 +441,9 @@ def minimize_dfa(dfa: Fsa) -> Fsa:
     The input and output remain LOMAP FSA instances for compatibility.
     """
     try:
-        auto_dfa = fsa_to_automata_dfa(dfa)
+        auto_dfa = dfa.to_automata_dfa()
         min_auto = auto_dfa.minify(retain_names=False)
-        return automata_dfa_to_fsa(min_auto, dfa.props, template=dfa)
+        return Fsa.from_automata_dfa(min_auto, dfa.props, template=dfa)
     except Exception as exc:
         logger.warning('[minimize_dfa] automata-lib minimization failed (%s). Returning original DFA.', exc)
         return dfa
@@ -376,15 +471,24 @@ def accept_prop(props: list[str], prop:str|None=None, boolean:bool|None=None):
     else:
         raise AssertionError('Either prop or boolean must be given!')
     
-    dfa = Fsa(props, directed=True, multi=False)
-    dfa.name = name
-    bitmaps = dfa.get_guard_bitmap(guard)
-    ngen = it.count()
-    u, v = ngen.__next__(), ngen.__next__()
-    dfa.g.add_edge(u, v, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label})
-    dfa.init[u] = 1
-    dfa.final.add(v)
-    
+    template = Fsa(props, directed=True, multi=False)
+    template.name = name
+    bitmaps = template.get_guard_bitmap(guard)
+    input_symbols = set(template.alphabet)
+
+    transitions = {0: {}, 1: {}}
+    for symbol in bitmaps:
+        transitions[0][symbol] = 1
+
+    auto_dfa = AutoDFA(
+        states={0, 1},
+        input_symbols=input_symbols,
+        transitions=transitions,
+        initial_state=0,
+        final_states={1},
+        allow_partial=True,
+    )
+    dfa = _fsa_from_auto(auto_dfa, template)
     init_tree(dfa, operation=Op.accept)
     return dfa
 
@@ -404,19 +508,30 @@ def hold(props: list[str], prop: str, duration: int, negation:bool=False, boolea
         guard = prop if not negation else '!' + prop
         label = AtomicPropositionRule(prop) if not negation else NegationRule(AtomicPropositionRule(prop))
         name_prop = 'not ' + prop if negation else prop
-    dfa = Fsa(props, directed=True, multi=False)
-    dfa.name = '(Hold {} {} )'.format(duration, name_prop)
-    bitmaps = dfa.get_guard_bitmap(guard)
-    
-    ngen = it.count()
-    nodes = [ngen.__next__() for _ in range(duration+2)] #TODO
-    attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
-    nx.add_path(dfa.g, nodes, **attr_dict)
-    
-    u, v = nodes[0], nodes[-1]
-    dfa.init[u] = 1
-    dfa.final.add(v)
-    
+    template = Fsa(props, directed=True, multi=False)
+    template.name = '(Hold {} {} )'.format(duration, name_prop)
+    bitmaps = template.get_guard_bitmap(guard)
+    input_symbols = set(template.alphabet)
+
+    total_states = duration + 2
+    states = set(range(total_states))
+    transitions = {state: {} for state in states}
+    for state in range(total_states - 1):
+        for symbol in bitmaps:
+            transitions[state][symbol] = state + 1
+
+    for symbol in input_symbols:
+        transitions[total_states - 1][symbol] = total_states - 1
+
+    auto_dfa = AutoDFA(
+        states=states,
+        input_symbols=input_symbols,
+        transitions=transitions,
+        initial_state=0,
+        final_states={total_states - 1},
+        allow_partial=True,
+    )
+    dfa = _fsa_from_auto(auto_dfa, template)
     init_tree(dfa, operation=Op.hold)
     logger.debug('[hold] Prop: {} Duration: {} Negation: {} Boolean: {} Props: {}'.format(prop, duration, negation, boolean, props))
     return dfa
@@ -424,10 +539,10 @@ def hold(props: list[str], prop: str, duration: int, negation:bool=False, boolea
 def complement(dfa: Fsa) -> Fsa:
     """Complements the DFA using automata-lib while preserving Fsa wrapper."""
     try:
-        auto_dfa = fsa_to_automata_dfa(dfa)
+        auto_dfa = dfa.to_automata_dfa()
         comp_auto = auto_dfa.complement(minify=False)
-        comp_fsa = automata_dfa_to_fsa(comp_auto, dfa.props, template=dfa)
-        dfa.g = comp_fsa.g
+        comp_fsa = Fsa.from_automata_dfa(comp_auto, dfa.props, template=dfa)
+        dfa._sync_from_auto(comp_auto)
         dfa.init = comp_fsa.init
         dfa.final = comp_fsa.final
         dfa.alphabet = comp_fsa.alphabet
@@ -435,7 +550,7 @@ def complement(dfa: Fsa) -> Fsa:
     except Exception as exc:
         logger.warning('[complement] automata-lib complement failed (%s). Falling back to trap-state complement.', exc)
         dfa.add_trap_state()
-        dfa.final = set(dfa.g.nodes()) - set(dfa.final)
+        dfa.final = set(dfa.states) - set(dfa.final)
         return dfa
 
 def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
@@ -452,36 +567,38 @@ def concatenation(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     assert dfa1.alphabet == dfa2.alphabet
     assert len(dfa1.init) == 1 and len(dfa2.init) == 1
     # assert len(dfa1.final) == 1 and len(dfa2.final) == 1
-    
-    dfa = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
-    dfa.name = '(Concat {} {} )'.format(dfa1.name, dfa2.name)
-    
-    # relabel the two DFAs to avoid state name collisions and merge the final
-    # state of dfa1 with the initial state of dfa2
-    relabel_dfa(dfa1, start=0)
-    init2 = next(iter(dfa2.init.keys()))
-    final1 = iter(dfa1.final).__next__()
-    marked_pairs = []
-    for u, v in dfa1.g.edges():
-        if u in dfa1.final:
-            marked_pairs.append((u, v))
-    for u, v in marked_pairs:
-        dfa1.g.remove_edge(u, v)
-    relabel_dfa(dfa1, {u: final1 for u in dfa1.final}, start=0)
+    template = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
 
-    relabel_dfa(dfa2, mapping={init2: final1}, start=dfa1.g.number_of_nodes())
-    assert len(set(dfa1.g.nodes()) & set(dfa2.g.nodes())) == 1
-    dfa.g.add_edges_from(dfa1.g.edges(data=True))
-    dfa.g.add_edges_from(dfa2.g.edges(data=True))
+    dfa1_final = dfa1.unify_accepting_states()
+    if dfa1_final is None:
+        return dfa1
+    relabel_dfa(dfa2, start=max(filter(lambda x: isinstance(x, int) or isinstance(x, str) and x.isdigit(), dfa1.states)) + 1)
+
+
+    dfa2_init = dfa2.init.keys()[0]
+    transitions = {state: dict(lookup) for state, lookup in dfa1.transitions.items()}
+    transitions.update({state: dict(lookup) for state, lookup in dfa2.transitions.items()})
+
+
+    for symbol in dfa1.alphabet:
+        if symbol in transitions[dfa2_init]:
+            transitions[dfa1_final][symbol] = transitions[dfa2_init][symbol]
+        else:
+            transitions[dfa1_final].pop(symbol, None)
     
-    # define initial state and final state
-    dfa.init = dict(dfa1.init)
-    dfa.final = set(dfa2.final)
-    
-    dfa = minimize_dfa(dfa)
+    transitions.pop(dfa2_init, None)
+
+    dfa = AutoDFA(
+        states=dfa1.states.union(dfa2.states) - set([dfa2_init]),
+        input_symbols=dfa1.alphabet,
+        transitions=transitions,
+        initial_state=dfa1.init.keys()[0],
+        final_states=set(dfa2.final),
+        allow_partial=True,
+    )
 
     logger.debug('[concatenation] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
-    return dfa
+    return _fsa_from_auto(dfa, template)
 
 def intersection(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     '''Creates a DFA which accepts the intersection of the languages
@@ -496,95 +613,24 @@ def intersection(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     assert len(dfa1.init) == 1 and len(dfa2.init) == 1
     assert len(dfa1.final) >= 1 and len(dfa2.final) >= 1
 
-    # Generic boolean-product path for multi-final DFAs (e.g., complements).
-    # The legacy path below is tailored for single-final TWTL constructions.
-    if len(dfa1.final) > 1 or len(dfa2.final) > 1:
-        dfa = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
-        dfa.name = '(Intersection {} {} )'.format(dfa1.name, dfa2.name)
+    template = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
+    template.name = '(Intersection {} {} )'.format(dfa1.name, dfa2.name)
 
-        init = list(it.product(dfa1.init.keys(), dfa2.init.keys()))
-        dfa.init = dict(zip(init, (1,) * len(init)))
+    auto1 = _auto_from_fsa(dfa1)
+    auto2 = _auto_from_fsa(dfa2)
+    auto_int = auto1.intersection(
+        auto2
+    )
+    dfa = _fsa_from_auto(auto_int, template)
 
-        stack = list(init)
-        while stack:
-            u1, u2 = stack.pop()
-            for _, v1, d1 in dfa1.g.edges(u1, data=True):
-                for _, v2, d2 in dfa2.g.edges(u2, data=True):
-                    bitmaps = d1['input'] & d2['input']
-                    if bitmaps:
-                        if (v1, v2) not in dfa.g:
-                            stack.append((v1, v2))
-                        guard = '({}) & ({})'.format(d1['guard'], d2['guard'])
-                        label = AndRule(d1['label'], d2['label'])
-                        dfa.g.add_edge((u1, u2), (v1, v2), **{'weight': 0, 'input': bitmaps, 'guard': guard, 'label': label})
+    # if getDFAType() == DFAType.Infinity and hasattr(dfa1, 'tree') and hasattr(dfa2, 'tree'):
+    #     mark_product(dfa1, dfa2, dfa, Op.intersection)
 
-        dfa.final = {(u, v) for u, v in dfa.g.nodes() if u in dfa1.final and v in dfa2.final}
+    # if getDFAType() == DFAType.Normal:
+    #     dfa = minimize_dfa(dfa)
 
-        if getDFAType() == DFAType.Infinity:
-            # mark_product(dfa1, dfa2, dfa, Op.intersection)
-            pass
-        elif getDFAType() == DFAType.Normal:
-            dfa = minimize_dfa(dfa)
-        else:
-            raise ValueError('DFA type must be either DFAType.Normal or ' +
-                             'DFAType.Infinity! {} was given!'.format(getDFAType()))
-
-        relabel_dfa(dfa)
-        return dfa
-    
-    dfa = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
-    dfa.name = '(Intersection {} {} )'.format(dfa1.name, dfa2.name)
-    
-    init = list(it.product(dfa1.init.keys(), dfa2.init.keys()))
-    dfa.init = dict(zip(init, (1,)*len(init)))
-    assert len(dfa.init) == 1
-    
-    stack = list(init)
-    while stack:
-        u1, u2 = stack.pop()
-        for _, v1, d1 in dfa1.g.edges(u1, data=True):
-            for _, v2, d2 in dfa2.g.edges(u2, data=True):
-                bitmaps = d1['input'] & d2['input']
-                if bitmaps:
-                    if (v1, v2) not in dfa.g:
-                        stack.append((v1, v2))
-                    guard = '({}) & ({})'.format(d1['guard'], d2['guard'])
-                    label = AndRule(d1['label'], d2['label'])
-                    attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
-                    dfa.g.add_edge((u1, u2), (v1, v2), **attr_dict)
-        if u1 in dfa1.final:
-            for _, v2, d2 in dfa2.g.edges(u2, data=True):
-                if (u1, v2) not in dfa.g:
-                    stack.append((u1, v2))
-                bitmaps = set(d2['input'])
-                guard = d2['guard']
-                label = d2['label']
-                dfa.g.add_edge((u1, u2), (u1, v2), **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label})
-        if u2 in dfa2.final:
-            for _, v1, d1 in dfa1.g.edges(u1, data=True):
-                if (v1, u2) not in dfa.g:
-                    stack.append((v1, u2))
-                bitmaps = set(d1['input'])
-                guard = d1['guard']
-                label = d1['label']
-                dfa.g.add_edge((u1, u2), (v1, u2), **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label})
-    
-    # the set of final states is the product of final sets of dfa1 and dfa2
-    dfa.final = set(it.product(dfa1.final, dfa2.final))
-    
-    if getDFAType() == DFAType.Infinity:
-        # mark_product(dfa1, dfa2, dfa, Op.intersection)
-        pass
-    elif getDFAType() == DFAType.Normal:
-        # minimize the DFA
-        dfa = minimize_dfa(dfa)
-    else:
-        raise ValueError('DFA type must be either DFAType.Normal or ' +
-                         'DFAType.Infinity! {} was given!'.format(getDFAType()))
-    
-    # relabel states
     relabel_dfa(dfa)
-    
+
     logger.debug('[intersection] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
     return dfa
 
@@ -600,122 +646,24 @@ def union(dfa1: Fsa, dfa2: Fsa) -> Fsa:
     # assert len(dfa1.init) == 1 and len(dfa2.init) == 1
     # assert len(dfa1.final) == 1 and len(dfa2.final) == 1
     
-    dfa = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
-    dfa.name = '(Union {} {} )'.format(dfa1.name, dfa2.name)
-    choices = {}
+    template = Fsa(dfa1.props, dfa1.directed, dfa1.multi)
+    template.name = '(Union {} {} )'.format(dfa1.name, dfa2.name)
 
-    # Generic boolean-product path for multi-final DFAs (e.g., complements).
-    # The legacy path below is tailored for single-final TWTL constructions.
-    if len(dfa1.final) > 1 or len(dfa2.final) > 1:
-        init = list(it.product(dfa1.init.keys(), dfa2.init.keys()))
-        dfa.init = dict(zip(init, (1,) * len(init)))
+    auto1 = _auto_from_fsa(dfa1)
+    auto2 = _auto_from_fsa(dfa2)
+    auto_union = auto1.union(
+        auto2
+    )
+    dfa = _fsa_from_auto(auto_union, template)
 
-        stack = list(init)
-        while stack:
-            u1, u2 = stack.pop()
-            for _, v1, d1 in dfa1.g.edges(u1, data=True):
-                for _, v2, d2 in dfa2.g.edges(u2, data=True):
-                    bitmaps = d1['input'] & d2['input']
-                    if bitmaps:
-                        if (v1, v2) not in dfa.g:
-                            stack.append((v1, v2))
-                        guard = '({}) | ({})'.format(d1['guard'], d2['guard'])
-                        label = OrRule(d1['label'], d2['label'])
-                        dfa.g.add_edge((u1, u2), (v1, v2), **{'weight': 0, 'input': bitmaps, 'guard': guard, 'label': label})
+    # if getDFAType() == DFAType.Infinity and hasattr(dfa1, 'tree') and hasattr(dfa2, 'tree'):
+    #     mark_product(dfa1, dfa2, dfa, Op.union)
 
-        dfa.final = {(u, v) for u, v in dfa.g.nodes() if u in dfa1.final or v in dfa2.final}
+    # if getDFAType() == DFAType.Normal:
+    #     dfa = minimize_dfa(dfa)
 
-        if getDFAType() == DFAType.Infinity:
-            # mark_product(dfa1, dfa2, dfa, Op.union, choices)
-            pass
-        elif getDFAType() == DFAType.Normal:
-            dfa = minimize_dfa(dfa)
-        else:
-            raise ValueError('DFA type must be either DFAType.Normal or ' +
-                             'DFAType.Infinity! {} was given!'.format(getDFAType()))
-
-        relabel_dfa(dfa)
-        return dfa
-    
-    # add self-loops on final states and trap states
-    attr_dict={'weight': 0, 'input': dfa.alphabet, 'guard' : '(1)', 'label': TrueRule()}
-    dfa1.g.add_edges_from([(s, s, attr_dict) for s in dfa1.final], **attr_dict)
-    dfa2.g.add_edges_from([(s, s, attr_dict) for s in dfa2.final], **attr_dict)
-    dfa1.add_trap_state()
-    dfa2.add_trap_state()
-    dfa1.g.remove_edges_from([(s, s) for s in dfa1.final])
-    dfa2.g.remove_edges_from([(s, s) for s in dfa2.final])
-    
-    init = list(it.product(dfa1.init.keys(), dfa2.init.keys()))
-    dfa.init = dict(zip(init, (1,)*len(init)))
-    assert len(dfa.init) == 1 # dfa1 and dfa2 are deterministic 
-    
-    stack = list(init)
-    while stack:
-        u1, u2 = stack.pop()
-        for _, v1, d1 in dfa1.g.edges(u1, data=True):
-            for _, v2, d2 in dfa2.g.edges(u2, data=True):
-                bitmaps = d1['input'] & d2['input']
-                if bitmaps:
-                    if (v1, v2) not in dfa.g:
-                        stack.append((v1, v2))
-                    guard = '({}) & ({})'.format(d1['guard'], d2['guard'])
-                    label = AndRule(d1['label'], d2['label'])
-                    attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
-                    dfa.g.add_edge((u1, u2), (v1, v2), **attr_dict)
-    
-    # compute set of final states
-    dfa.final = set([(u, v) for u, v in dfa.g.nodes()
-                                         if u in dfa1.final or v in dfa2.final])
-    
-    # remove trap states
-    dfa1.g.remove_nodes_from(['trap'])
-    dfa2.g.remove_nodes_from(['trap'])
-    dfa.g.remove_nodes_from([('trap', 'trap')])
-    
-    # merge finals
-    if len(dfa.final) > 1:
-        candidate = (iter(dfa1.final).__next__(), iter(dfa2.final).__next__())
-        final = candidate if candidate in dfa.g else next(iter(dfa.final))
-        # satisfies both left and right sub-formulae
-        # choices = dict([(u, Choice(both=d['input']))
-        #                        for u, _, d in dfa.g.in_edges(final, data=True)])
-        choices = {}
-        for u, _, d in dfa.g.in_edges(final, data=True):
-            choices[u] = Choice(both=d['input'])
-        for u, v, d in dfa.g.in_edges(dfa.final - set([final]), data=True):
-            bitmaps = set(d['input'])
-            guard = d['guard']
-            label = d['label']
-            if dfa.g.has_edge(u, final):
-                x = dfa.g[u][final]
-                bitmaps |= x['input']
-                guard = '({}) | ({})'.format(guard, dfa.g[u][final]['guard'])
-                label = OrRule(label, dfa.g[u][final]['label'])
-            dfa.g.add_edge(u, final, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label})
-            if v[0] in dfa1.final: # satisfies only the left sub-formula
-                assert v[1] not in dfa2.final
-                choices.setdefault(u, Choice()).left.update(d['input'])
-            if v[1] in dfa2.final: # satisfies only the right sub-formula
-                assert v[0] not in dfa1.final
-                choices.setdefault(u, Choice()).right.update(d['input'])
-        # remove all other final states
-        dfa.g.remove_nodes_from(dfa.final - set([final]))
-        dfa.final = set([final])
-    
-    if getDFAType() == DFAType.Infinity:
-        # mark_product(dfa1, dfa2, dfa, Op.union, choices)
-        pass
-    elif getDFAType() == DFAType.Normal:
-        # minimize the DFA
-        dfa = minimize_dfa(dfa)
-    else:
-        raise ValueError('DFA type must be either DFAType.Normal or ' +
-                         'DFAType.Infinity! {} was given!'.format(getDFAType()))
-    
-    # relabel states
     relabel_dfa(dfa)
-    
+
     logger.debug('[union] DFA1: {} DFA2: {}'.format(dfa1.name, dfa2.name))
     return dfa
 
@@ -737,44 +685,49 @@ def eventually(phi_dfa: Fsa, low: int) -> Fsa:
     NOTE: Assumes that phi_dfa contains no ``trap'' states, i.e. states which do
     not reach a final state. 
     '''
-    nfa = Nfa(phi_dfa.props, phi_dfa.directed, True)
-    nfa.name = '(Eventually {} {})'.format(phi_dfa.name, low)
-    nfa.g = nx.MultiDiGraph(phi_dfa.g)
-    nfa.init = dict(phi_dfa.init)
-    nfa.final = set(phi_dfa.final)
-    if hasattr(phi_dfa, 'tree'):
-        nfa.tree = copy.deepcopy(phi_dfa.tree)
-    if hasattr(phi_dfa, 'kind'):
-        nfa.kind = phi_dfa.kind
+    template = Fsa(phi_dfa.props, phi_dfa.directed, False)
+    template.name = '(Eventually {} {})'.format(phi_dfa.name, low)
 
-    init = next(iter(nfa.init.keys())) #TODO change init to single state
-    original_states = list(nfa.g.nodes())
+    auto_dfa = _auto_from_fsa(phi_dfa).to_complete()
+    auto_nfa = AutoNFA.from_dfa(auto_dfa)
 
-    # add states to accept a prefix word of any symbol of length low
+    states = set(auto_nfa.states)
+    input_symbols = set(auto_nfa.input_symbols)
+    transitions = {
+        state: {sym: set(dests) for sym, dests in auto_nfa.transitions.get(state, {}).items()}
+        for state in states
+    }
+
+    original_init = auto_nfa.initial_state
+    original_states = list(states)
+    initial_state = original_init
+
     if low > 0:
-        guard = '(1)'
-        label = TrueRule()
-        bitmaps = nfa.get_guard_bitmap(guard)
-        nodes = [i for i in range(nfa.g.number_of_nodes(), nfa.g.number_of_nodes()+low)]
-        attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
-        nx.add_path(nfa.g, nodes, **attr_dict)
-        nfa.g.add_edge(nodes[-1], init, **attr_dict)
-        nfa.init = {nodes[0] : 1}
+        prefix_states = [('prefix', i) for i in range(low)]
+        states.update(prefix_states)
+        for i, state in enumerate(prefix_states):
+            transitions.setdefault(state, {})
+            next_state = prefix_states[i + 1] if i + 1 < low else original_init
+            for sym in input_symbols:
+                transitions[state].setdefault(sym, set()).add(next_state)
+        initial_state = prefix_states[0]
 
-    # every original non-final state can restart matching on a miss, and every
-    # original state can also restart via an epsilon transition before the next
-    # symbol is consumed.
     for state in original_states:
-        nfa.add_epsilon_transition(state, init)
+        transitions.setdefault(state, {})
+        transitions[state].setdefault('', set()).add(original_init)
 
-        # if state not in nfa.final:
-        #     bitmaps = nfa.alphabet - set()
-        #     attr_dict = {'weight': 0, 'input': bitmaps, 'guard': '(else)', 'label': ElseRule()}
-        #     nfa.g.add_edge(state, init, **attr_dict)
-
-    dfa = nfa.determinize()
-    if hasattr(phi_dfa, 'tree'):
-        mark_eventually(phi_dfa, dfa, low)
+    nfa = AutoNFA(
+        states=states,
+        input_symbols=input_symbols,
+        transitions=transitions,
+        initial_state=initial_state,
+        final_states=set(auto_nfa.final_states)
+    )
+    auto_event = AutoDFA.from_nfa(nfa, minify=True)
+    dfa = _fsa_from_auto(auto_event, template)
+    dfa.unify_accepting_states()
+    # if hasattr(phi_dfa, 'tree'):
+        # mark_eventually(phi_dfa, dfa, low)
     logger.debug('[eventually] Low: {} DFA: {}'.format(low, phi_dfa.name))
     return dfa
 
@@ -785,68 +738,96 @@ def repeat(phi_dfa: Fsa, low: int, high: int) -> Fsa:
     assert len(phi_dfa.init) == 1
     # assert len(phi_dfa.final) == 1
     
-    init_state = next(iter(phi_dfa.init.keys()))
-    final_state = set(phi_dfa.final).pop()
-    
-    # initialize the resulting dfa
-    dfa = Fsa(phi_dfa.props, phi_dfa.directed, phi_dfa.multi)
-    dfa.name = '(Repeat {} {} {} )'.format(phi_dfa.name, low, high)
-    # compute the maximum number of restarts
-    b = nx.shortest_path_length(phi_dfa.g, source=init_state, target=final_state)
+    auto_phi = _auto_from_fsa(phi_dfa)
+    init_state = auto_phi.initial_state
+    if len(auto_phi.final_states) != 1:
+        raise ValueError('repeat() expects exactly one final state')
+    final_state = next(iter(auto_phi.final_states))
+
+    transitions = {state: dict(auto_phi.transitions.get(state, {})) for state in auto_phi.states}
+    b = _shortest_path_length(transitions, init_state, final_state)
     d = high - low - b + 2
-    # copy dfa to dfa_aux and initialize the list of restart states
+
+    input_symbols = set(auto_phi.input_symbols)
+    combined_transitions = {}
+    combined_states = set()
     inits = []
-    nstates = 0
+    final_marker = ('final',)
+
     for k in range(d):
-        # 1. relabel dfa_aux
-        mapping = dict(zip(phi_dfa.g.nodes(),
-                         range(nstates, nstates + phi_dfa.g.number_of_nodes())))
-        mapping[final_state] = -1 # mark final state as special
-        dfa_aux = relabel_dfa(phi_dfa, mapping, copy=True)
-        # 2. compute truncated dfa_aux
-        truncate_dfa(dfa_aux, cutoff=(high-low+1)-k)
-        # 3. add truncated dfa_aux to dfa
-        dfa.g.add_edges_from(dfa_aux.g.edges(data=True))
-        inits.append(next(iter(dfa_aux.init.keys())))
-        nstates += dfa_aux.g.number_of_nodes()
-    # set initial and final state
-    dfa.init = {inits[0] : 1}
-    dfa.final = set([-1])
+        mapping = {state: (k, state) for state in auto_phi.states}
+        mapping[final_state] = final_marker
+
+        copy_states = set(mapping.values())
+        copy_transitions = {state: {} for state in copy_states}
+        for src, lookup in transitions.items():
+            for sym, dst in lookup.items():
+                copy_transitions[mapping[src]][sym] = mapping[dst]
+
+        auto_copy = AutoDFA(
+            states=copy_states,
+            input_symbols=input_symbols,
+            transitions=copy_transitions,
+            initial_state=mapping[init_state],
+            final_states={final_marker},
+            allow_partial=True,
+        )
+        auto_copy = _truncate_auto_dfa(auto_copy, cutoff=(high - low + 1) - k)
+
+        combined_states |= set(auto_copy.states)
+        for src, lookup in auto_copy.transitions.items():
+            combined_transitions.setdefault(src, {})
+            combined_transitions[src].update(lookup)
+        inits.append(auto_copy.initial_state)
+
+    combined_states.add(final_marker)
+
     # create restart transitions
     current_states = set([inits[0]])
-    for rstate in inits[1:]: # current restart state
-        next_states = set([])
-        # connect current states to restart state for (else) symbols
+    for rstate in inits[1:]:
+        next_states = set()
         for state in current_states:
-            bitmaps = set()
-            guard = '(else)'
-            label = ElseRule()
-            for _, next_state, d in dfa.g.out_edges(state, data=True):
-                bitmaps |= d['input']
-                next_states.add(next_state)
-            bitmaps = dfa.alphabet - bitmaps
-            
-            if state not in dfa.final and bitmaps:
-                dfa.g.add_edge(state, rstate, **{'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label})
-        # update current states
+            outgoing = combined_transitions.get(state, {})
+            next_states.update(outgoing.values())
+            missing = input_symbols - set(outgoing.keys())
+            if state != final_marker and missing:
+                combined_transitions.setdefault(state, {})
+                for sym in missing:
+                    combined_transitions[state][sym] = rstate
         current_states = next_states | set([rstate])
-    
-    # relabel states
-    relabel_dfa(dfa)
-    # add states to accept a prefix word of any symbol of length low
+
+    initial_state = inits[0]
     if low > 0:
-        guard = '(1)'
-        label = TrueRule()
-        bitmaps = dfa.get_guard_bitmap(guard)
-        ngen = it.count(start=dfa.g.number_of_nodes())
-        nodes = [ngen.__next__() for _ in range(low)]
-        attr_dict={'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': label}
-        nx.add_path(dfa.g, nodes, **attr_dict)
-        dfa.g.add_edge(nodes[-1], next(iter(dfa.init.keys())), **attr_dict)
-        dfa.init = {nodes[0] : 1}
-    
+        prefix_states = [('prefix', i) for i in range(low)]
+        combined_states.update(prefix_states)
+        for i, state in enumerate(prefix_states):
+            combined_transitions.setdefault(state, {})
+            next_state = prefix_states[i + 1] if i + 1 < low else initial_state
+            for sym in input_symbols:
+                combined_transitions[state][sym] = next_state
+        initial_state = prefix_states[0]
+
+    for state in combined_states:
+        combined_transitions.setdefault(state, {})
+
+    auto_repeat = AutoDFA(
+        states=combined_states,
+        input_symbols=input_symbols,
+        transitions=combined_transitions,
+        initial_state=initial_state,
+        final_states={final_marker},
+        allow_partial=True,
+    )
+    if getDFAType() == DFAType.Normal:
+        auto_repeat = auto_repeat.minify(retain_names=False)
+
+    template = Fsa(phi_dfa.props, phi_dfa.directed, phi_dfa.multi)
+    template.name = '(Repeat {} {} {} )'.format(phi_dfa.name, low, high)
+    dfa = _fsa_from_auto(auto_repeat, template)
+    dfa.unify_accepting_states()
+    relabel_dfa(dfa)
     logger.debug('[within] Low: {} High: {} DFA: {}'.format(low, high, phi_dfa.name))
-    return minimize_dfa(dfa)
+    return dfa
 
 def truncate_dfa(dfa: Fsa, cutoff: int) -> Fsa:
     '''Returns a dfa which accepts only the words of length at most cutoff from
@@ -857,25 +838,11 @@ def truncate_dfa(dfa: Fsa, cutoff: int) -> Fsa:
     NetworkX is available at http://networkx.github.io.
     '''
     assert len(dfa.init) == 1 # deterministic model
-    source = next(iter(dfa.init.keys()))
-    
-    # compute transitions which form path of length at most cutoff in the dfa
-    visited = set([source])
-    edges = []
-    nextlevel = [(source, iter(dfa.g[source]))]
-    for _ in range(cutoff):
-        thislevel = nextlevel
-        nextlevel = []
-        for parent, children in thislevel:
-            for child in children:
-                edges.append((parent, child))
-                if child not in visited:
-                    visited.add(child)
-                    nextlevel.append((child, iter(dfa.g[child])))
-    
-    # remove transitions which are not part of paths of length at most cutoff
-    dfa.g.remove_edges_from([e for e in dfa.g.edges() if e not in edges])
-    # remove all states which do not reach the final states
-    dfa.remove_trap_states()
-    
+    auto_dfa = _auto_from_fsa(dfa)
+    truncated = _truncate_auto_dfa(auto_dfa, cutoff=cutoff)
+    updated = _fsa_from_auto(truncated, dfa)
+    dfa._sync_from_auto(truncated)
+    dfa.init = updated.init
+    dfa.final = updated.final
+    dfa.alphabet = updated.alphabet
     return dfa

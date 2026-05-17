@@ -260,14 +260,14 @@ def translate(formula: str, kind:int|str='both', norm=False, optimize=True):
     if dfa_type.is_normal():
         setDFAType(DFAType.Normal)
         dfa = evaluate_dfa(t, alphabet)
-        dfa.kind = DFAType.Normal
+        # dfa.kind = DFAType.Normal
         result.append(dfa)
     
     if dfa_type.is_infinity():
         setDFAType(DFAType.Infinity)
         setOptimizationFlag(optimize)
         dfa_inf = evaluate_dfa(t, alphabet)
-        dfa_inf.kind = DFAType.Infinity
+        # dfa_inf.kind = DFAType.Infinity
         result.append(dfa_inf)
     
     if norm: # compute TWTL bound
@@ -286,8 +286,9 @@ def translate(formula: str, kind:int|str='both', norm=False, optimize=True):
             logging.debug('[spec] mode: {} DFA: {}'.format(name, pdfa))
             if mode == DFAType.Infinity:
                 logging.debug('[spec] tree:\n{}'.format(pdfa.tree.pprint()))
-            logging.debug('[spec] No of nodes: {}'.format(pdfa.g.number_of_nodes()))
-            logging.debug('[spec] No of edges: {}'.format(pdfa.g.number_of_edges()))
+            nodes, edges = pdfa.size()
+            logging.debug('[spec] No of nodes: {}'.format(nodes))
+            logging.debug('[spec] No of edges: {}'.format(edges))
     
     return tuple(result)
 
@@ -299,5 +300,5 @@ if __name__ == '__main__':
                     kind=DFAType.Infinity, norm=True)
     
     print(res)
-    print(res[1].g.nodes())
+    print(res[1].states)
 

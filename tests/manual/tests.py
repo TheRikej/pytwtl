@@ -40,8 +40,7 @@ def test_accept_prop_boolean(verbose=False, show=False):
         if verbose:
             print(dfa)
         if show:
-            dfa.visualize(draw='matplotlib')
-            plt.show()
+            pass
 
 def test_complement(verbose=False, show=False):
     props = ['A', 'B', 'C']
@@ -55,12 +54,11 @@ def test_complement(verbose=False, show=False):
         print(dfa.tree)
         # print(dfa.counters)
         print()
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     
     if show:
-        dfa.visualize(draw='matplotlib')
-        plt.show()
+        pass
     
     dfa = complement(dfa)
     
@@ -70,12 +68,11 @@ def test_complement(verbose=False, show=False):
         print(dfa.tree)
         # print(dfa.counters)
         print()
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     
     if show:
-        dfa.visualize(draw='matplotlib')
-        plt.show()
+        pass
 
 def test_intersection_union(verbose=False, show=False):
     props = ['A', 'B', 'C']
@@ -98,16 +95,10 @@ def test_intersection_union(verbose=False, show=False):
                 print(fsa.tree)
                 # print(fsa.counters)
                 print()
-                for u, v, d in fsa.g.edges(data=True):
-                    print((u, v), d)
+                for u, v, symbol in fsa.iter_transitions():
+                    print((u, v), symbol)
         if show:
-            dfa1.visualize(draw='matplotlib')
-            plt.show()
-            dfa2.visualize(draw='matplotlib')
-            plt.show()
-            # complement(dfa)
-            dfa.visualize(draw='matplotlib')
-            plt.show()
+            pass
 
 def test_concatenation(verbose=False, show=False):
     props = ['A', 'B', 'C']
@@ -124,15 +115,10 @@ def test_concatenation(verbose=False, show=False):
         print(dfa.tree)
         # print(dfa.counters)
         print()
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     if show:
-        dfa1.visualize(draw='matplotlib')
-        plt.show()
-        dfa2.visualize(draw='matplotlib')
-        plt.show()
-        dfa.visualize(draw='matplotlib')
-        plt.show()
+        pass
 
 def test_hold(verbose=False, show=False):
     props = ['A', 'B', 'C']
@@ -143,8 +129,7 @@ def test_hold(verbose=False, show=False):
         if verbose:
             print(dfa)
         if show:
-            dfa.visualize(draw='matplotlib')
-            plt.show()
+            pass
 
 def test_repeat(verbose=False, show=False):
     setDFAType(DFAType.Normal)
@@ -155,22 +140,20 @@ def test_repeat(verbose=False, show=False):
     dfa = repeat(dfa, low=2, high=4)
     if verbose:
         print(dfa)
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     if show:
-        dfa.visualize()
-        plt.show()
+        pass
      
     # Test with low zero
     dfa = hold(props, prop='A', duration=2, negation=False)
     dfa = repeat(dfa, low=0, high=4)
     if verbose:
         print(dfa)
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     if show:
-        dfa.visualize()
-        plt.show()
+        pass
      
     # Test with trap state
     dfa = hold(props, prop='A', duration=2, negation=False)
@@ -178,11 +161,10 @@ def test_repeat(verbose=False, show=False):
     dfa = repeat(dfa, low=0, high=4)
     if verbose:
         print(dfa)
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     if show:
-        dfa.visualize()
-        plt.show()
+        pass
     
     # Test with truncated dfa
     dfa1 = hold(props, prop='A', duration=2, negation=False)
@@ -195,17 +177,16 @@ def test_repeat(verbose=False, show=False):
         print(dfa2)
         print('Union')
         print(dfa)
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     
     dfa = repeat(dfa, low=0, high=4)
     if verbose:
         print(dfa)
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     if show:
-        dfa.visualize()
-        plt.show()
+        pass
 
 def test_eventually(verbose=False, show=False):
     setDFAType(DFAType.Infinity)
@@ -219,11 +200,10 @@ def test_eventually(verbose=False, show=False):
         print(dfa.tree)
         # print(dfa.counters)
         print()
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     if show:
-        dfa.visualize(draw='matplotlib')
-        plt.show()
+        pass
     
     # Test with low zero
     dfa = hold(props, prop='A', duration=2, negation=False)
@@ -233,11 +213,10 @@ def test_eventually(verbose=False, show=False):
         print(dfa.tree)
         # print(dfa.counters)
         print()
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     if show:
-        dfa.visualize(draw='matplotlib')
-        plt.show()
+        pass
     
     # Test with trap state
     dfa = hold(props, prop='A', duration=2, negation=False)
@@ -248,11 +227,10 @@ def test_eventually(verbose=False, show=False):
         print(dfa.tree)
         # print(dfa.counters)
         print()
-        for u, v, d in dfa.g.edges(data=True):
-            print((u, v), d)
+        for u, v, symbol in dfa.iter_transitions():
+            print((u, v), symbol)
     if show:
-        dfa.visualize(draw='matplotlib')
-        plt.show()
+        pass
 
 def test_minimize(verbose=False, show=False):
     props = ['A']
@@ -265,16 +243,14 @@ def test_minimize(verbose=False, show=False):
     if verbose:
         print(dfa)
     if show:
-        dfa.visualize(draw='matplotlib')
-        plt.show()
+        pass
     
     dfa = minimize_dfa(dfa)
 
     if verbose:
         print(dfa)
     if show:
-        dfa.visualize(draw='matplotlib')
-        plt.show()
+        pass
 
 ################################################################################
 

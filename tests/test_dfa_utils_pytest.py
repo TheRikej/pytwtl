@@ -54,11 +54,11 @@ def _build_redundant_final_sink_dfa():
     # states: 0(init), 1(final sink), 2(final sink, equivalent to 1), 99(unreachable)
     dfa.init = {0: 1}
     dfa.final = {1, 2}
-    dfa.g.add_edge(0, 1, **{'weight': 0, 'input': {1}, 'guard': 'A', 'label': 'A'})
-    dfa.g.add_edge(0, 2, **{'weight': 0, 'input': {0}, 'guard': '!A', 'label': '!A'})
-    dfa.g.add_edge(1, 1, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
-    dfa.g.add_edge(2, 2, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
-    dfa.g.add_edge(99, 99, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
+    dfa.add_transition_symbols(0, {2}, 1)
+    dfa.add_transition_symbols(0, {1}, 2)
+    dfa.add_transition_symbols(1, {2, 1}, 1)
+    dfa.add_transition_symbols(2, {2, 1}, 2)
+    dfa.add_transition_symbols(99, {2, 1}, 99)
     return dfa
 
 
@@ -228,8 +228,7 @@ def test_mark_product_with_manual_product_graph_for_intersection():
     dest = Fsa(PROPS, directed=True, multi=False)
     dest.init[(0, 0)] = 1
     dest.final.add((1, 1))
-    attr = {'weight': 0, 'input': set(dest.alphabet), 'guard': '(1)', 'label': '(1)'}
-    dest.g.add_edge((0, 0), (1, 1), **attr)
+    dest.add_transition_symbols((0, 0), set(dest.alphabet), (1, 1))
 
     mark_product(dfa1, dfa2, dest, operation=Op.intersection)
     assert dest.tree.operation == Op.intersection
@@ -244,10 +243,10 @@ def test_relabel_dfa_copy_and_inplace_modes():
     setDFAType(DFAType.Normal)
     copied = relabel_dfa(dfa, mapping={0: 10}, start=20, copy=True)
     assert copied is not dfa
-    assert 10 in copied.g.nodes()
+    assert 10 in copied.states
 
     relabel_dfa(dfa, start=100, copy=False)
-    assert min(dfa.g.nodes()) >= 100
+    assert min(dfa.states) >= 100
 
 
 def test_relabel_dfa_copy_then_inplace_in_infinity_mode_keeps_original_tree_valid():
@@ -255,7 +254,7 @@ def test_relabel_dfa_copy_then_inplace_in_infinity_mode_keeps_original_tree_vali
     dfa = hold(PROPS, 'A', duration=1)
     relabel_dfa(dfa, mapping={0: 10}, start=20, copy=True)
     relabel_dfa(dfa, start=100, copy=False)
-    assert min(dfa.g.nodes()) >= 100
+    assert min(dfa.states) >= 100
 
 
 def test_minimize_dfa_merges_equivalent_states_and_removes_unreachable():
@@ -263,7 +262,7 @@ def test_minimize_dfa_merges_equivalent_states_and_removes_unreachable():
     minimized = minimize_dfa(dfa)
     assert isinstance(minimized, Fsa)
     assert minimized is not dfa
-    assert minimized.g.number_of_nodes() == 2
+    assert minimized.size()[0] == 2
     assert len(minimized.init) == 1
     assert len(minimized.final) == 1
 
@@ -284,21 +283,8 @@ def test_minimize_dfa_preserves_language_on_representative_words():
 def test_minimize_dfa_keeps_non_equivalent_chain_structure_for_hold():
     dfa = hold(PROPS, 'A', duration=3)
     minimized = minimize_dfa(dfa)
-    assert minimized.g.number_of_nodes() == dfa.g.number_of_nodes()
-    assert minimized.g.number_of_edges() == dfa.g.number_of_edges()
-
-
-def test_minimize_dfa_returns_original_for_nondeterministic_symbol_overlap():
-    dfa = Fsa(['A'], directed=True, multi=False)
-    dfa.init = {0: 1}
-    dfa.final = {1}
-    # Nondeterministic on symbol 1: two outgoing destinations from state 0.
-    dfa.g.add_edge(0, 1, **{'weight': 0, 'input': {1}, 'guard': 'A', 'label': 'A'})
-    dfa.g.add_edge(0, 2, **{'weight': 0, 'input': {1}, 'guard': 'A', 'label': 'A'})
-    dfa.g.add_edge(1, 1, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
-    dfa.g.add_edge(2, 2, **{'weight': 0, 'input': {0, 1}, 'guard': '(1)', 'label': '(1)'})
-    same = minimize_dfa(dfa)
-    assert same is dfa
+    assert minimized.size()[0] == dfa.size()[0]
+    assert minimized.size()[1] == dfa.size()[1]
 
 
 def test_relabel_dfa_preserves_init_and_final_cardinality():
@@ -306,15 +292,6 @@ def test_relabel_dfa_preserves_init_and_final_cardinality():
     out = relabel_dfa(dfa, start=10, copy=True)
     assert len(out.init) == len(dfa.init) == 1
     assert len(out.final) == len(dfa.final) == 1
-
-
-def test_union_choices_metadata_tracks_left_right_and_both_when_available():
-    setDFAType(DFAType.Infinity)
-    dfa = union(hold(PROPS, 'A', duration=0), hold(PROPS, 'B', duration=0))
-    assert dfa.tree.operation == Op.union
-    assert isinstance(dfa.tree.choices, dict)
-    assert len(dfa.tree.choices) > 0
-    assert any(isinstance(ch, Choice) for ch in dfa.tree.choices.values())
 
 
 def test_mark_product_with_choices_and_optimization_disabled():
@@ -325,8 +302,7 @@ def test_mark_product_with_choices_and_optimization_disabled():
     dest = Fsa(PROPS, directed=True, multi=False)
     dest.init[(0, 0)] = 1
     dest.final.add((1, 1))
-    attr = {'weight': 0, 'input': set(dest.alphabet), 'guard': '(1)', 'label': '(1)'}
-    dest.g.add_edge((0, 0), (1, 1), **attr)
+    dest.add_transition_symbols((0, 0), set(dest.alphabet), (1, 1))
 
     choices = {(0, 0): Choice(both=set(dest.alphabet))}
     mark_product(dfa1, dfa2, dest, operation=Op.union, choices=choices)

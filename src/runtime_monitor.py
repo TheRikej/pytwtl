@@ -7,7 +7,6 @@ import networkx as nx
 
 from automata.fa.dfa import DFA
 
-from automata_bridge import fsa_to_automata_dfa
 from lomap.classes.fsa import Fsa
 
 
@@ -20,7 +19,7 @@ def _as_automata_dfa(dfa):
     if isinstance(dfa, DFA):
         return dfa
     if isinstance(dfa, Fsa):
-        return fsa_to_automata_dfa(dfa)
+        return dfa.to_automata_dfa()
     raise TypeError('Expected a LOMAP Fsa or automata-lib DFA.')
 
 
@@ -70,8 +69,8 @@ class RuntimeMonitor(object):
     def _symbol_to_input(self, symbol):
         if isinstance(symbol, (set, list, tuple)) and self._props is not None:
             if not symbol:
-                return 0
-            return reduce(op.or_, [self._props.get(p, 0) for p in symbol], 0)
+                return 1
+            return reduce(op.or_, [self._props.get(p, 0) for p in symbol], 0) + 1
         return symbol
 
     def current(self):
@@ -253,6 +252,8 @@ def annotate_monitor(dfa: Fsa | DFA, precomputed=None):
     '''
     # dfa.add_trap_state()
     dfa = _create_complete_dfa(dfa)
+    # dfa.show_diagram(path='monitor_automata_test.png', horizontal=False)
+
     auto_dfa = _as_automata_dfa(dfa)
     if precomputed is None:
         g = _dfa_to_nx_graph(auto_dfa)

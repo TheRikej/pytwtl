@@ -44,11 +44,8 @@ def case1_synthesis(formula, ts_file):
     
     logging.debug('alphabet: {}'.format(dfa_inf.props))
     
-    for u, v, d in dfa_inf.g.edges(data=True):
-        logging.debug('({}, {}): {}'.format(u, v, d))
-    
-    dfa_inf.visualize(draw='matplotlib')
-    plt.show()
+    for u, v, symbol in dfa_inf.iter_transitions():
+        logging.debug('({}, {}) <- {}'.format(u, v, symbol))
     
     logging.debug('\nEnd of translate\n\n')
     

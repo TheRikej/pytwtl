@@ -25,7 +25,6 @@ license_text='''
 
 '''
 
-import networkx as nx
 from PartitionRefinement import PartitionRefinement
 
 import twtl
@@ -37,20 +36,23 @@ def minimize(dfa):
     Based on ...
     '''
     # refine partition of states by reversed neighborhoods
-    partition = PartitionRefinement(dfa.g.nodes())
+    partition = PartitionRefinement(dfa.states)
     partition.refine(dfa.final)
     unrefined = dict([(id(p), p) for p in partition])
     while unrefined:
         part = unrefined.pop(unrefined.iterkeys().__next__())
         for symbol in dfa.alphabet:
-            neighbors = set([v for v, _, d in dfa.g.in_edges(part, data=True)
-                                if symbol in d['input']])
+            neighbors = set()
+            for src, lookup in dfa.transitions.items():
+                for sym, dst in lookup.items():
+                    if sym == symbol and dst in part:
+                        neighbors.add(src)
             for new,old in partition.refine(neighbors):
                 if id(old) in unrefined or len(new) < len(old):
                     unrefined[id(new)] = new
                 else:
                     unrefined[id(old)] = old
-    print(dfa.g.number_of_nodes())
+    print(len(dfa.states))
     print(len(list(partition)))
     # convert partition to DFA
     nx.condensation

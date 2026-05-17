@@ -184,9 +184,7 @@ class Planner:
 
 		# Find the set of requests that can be serviced
 		# (D_service in alg.)
-		enabled_reqs = set([])
-		for _, _, d in self.local_fsa.g.out_edges((self.local_fsa_state,), data=True):
-			enabled_reqs = enabled_reqs | d['input']
+		enabled_reqs = set(self.local_fsa.transitions.get(self.local_fsa_state, {}).keys())
 		serviceable_reqs = local_reqs & enabled_reqs
 
 		# Find the cells with static and dynamic requests
@@ -295,11 +293,11 @@ class Planner:
 		found_next_local_fsa_state = False
 		next_local_req = local_ts.g.node[cell_next_star]['prop']
 		if next_local_req:
-			for _, next_local_fsa_state, d in self.local_fsa.g.out_edges((self.local_fsa_state,), data=True):
-				if d['input'] == next_local_req:
-					self.local_fsa_state = next_local_fsa_state
-					found_next_local_fsa_state = True
-					break
+			symbol = self.local_fsa.bitmap_of_props(next_local_req)
+			next_local_fsa_state = self.local_fsa.transitions.get(self.local_fsa_state, {}).get(symbol)
+			if next_local_fsa_state is not None:
+				self.local_fsa_state = next_local_fsa_state
+				found_next_local_fsa_state = True
 			assert found_next_local_fsa_state, 'Local FSA does not have a transition for %s from its current state %s' % (next_local_req, self.local_fsa_state)
 
 		# Turn off the serviced request as necessary

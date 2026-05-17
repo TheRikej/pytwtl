@@ -8,8 +8,10 @@ from runtime_monitor import VERDICT_FALSE, VERDICT_TRUE, VERDICT_UNKNOWN
 from twtl import monitor_runtime
 
 
-def _run_formula_monitor(formula, word):
+def _run_formula_monitor(formula, word, filename=None):
     mon = monitor_runtime(formula=formula)
+    if filename:
+        mon.visualize_graphviz(path=filename, layout='dot', show_current=True)
     initial = mon.current()
     steps = [mon.step(symbol) for symbol in word]
     return initial, steps
@@ -47,20 +49,22 @@ def test_monitor_runtime_integration_formula_conjunction_needs_both_obligations(
 
 def test_monitor_runtime_integration_optional_high_within_accepts_on_witness():
     formula = '[H^0 A]^[0]'
-    initial, steps = _run_formula_monitor(formula, [set(['A'])])
+    initial, steps = _run_formula_monitor(formula, [set(),set(['A'])])
 
     assert initial[0] == VERDICT_UNKNOWN
-    assert initial[1] == 1
-    assert steps[0] == (VERDICT_TRUE, 0)
+    assert initial[1] == math.inf
+    assert steps[0] == (VERDICT_UNKNOWN, math.inf)
+    assert steps[1] == (VERDICT_TRUE, 0)
 
 
 def test_monitor_runtime_integration_optional_high_disjunction_accepts_either_branch():
     formula = '[H^0 A]^[0] | [H^0 B]^[0]'
-    initial, steps = _run_formula_monitor(formula, [set(['B'])])
+    initial, steps = _run_formula_monitor(formula, [set(), set(['B'])])
 
     assert initial[0] == VERDICT_UNKNOWN
-    assert initial[1] == 1
-    assert steps[0] == (VERDICT_TRUE, 0)
+    assert initial[1] == math.inf
+    assert steps[0] == (VERDICT_UNKNOWN, math.inf)
+    assert steps[1] == (VERDICT_TRUE, 0)
 
 
 def test_monitor_runtime_integration_optional_high_conjunction_needs_both_obligations():
@@ -68,7 +72,7 @@ def test_monitor_runtime_integration_optional_high_conjunction_needs_both_obliga
     initial, steps = _run_formula_monitor(formula, [set(['A', 'B'])])
 
     assert initial[0] == VERDICT_UNKNOWN
-    assert initial[1] == 1
+    assert initial[1] == math.inf
     assert steps[0] == (VERDICT_TRUE, 0)
 
 

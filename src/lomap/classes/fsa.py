@@ -16,14 +16,10 @@
 
 from functools import reduce
 import copy
-import networkx as nx
 import re
 import subprocess as sp
-from collections import deque
-import itertools as it
 import operator as op
-from lomap.classes.model import Model
-from transition_rules import ElseRule, TrueRule
+from automata.fa.dfa import DFA as AutoDFA
 from . import scheck_binary
 import logging
 
@@ -31,7 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 #logger.addHandler(logging.NullHandler())
 
-class Fsa(Model):
+class Fsa(object):
 	"""
 	Base class for deterministic finite state automata.
 	"""
@@ -40,7 +36,11 @@ class Fsa(Model):
 		"""
 		LOMAP Fsa Automaton object constructor
 		"""
-		Model.__init__(self, directed=directed, multi=multi)
+		self.name = 'Unnamed system model'
+		self.directed = directed
+		self.multi = bool(multi)
+		self._dfa = None
+		self._allow_partial = True
 		
 		if type(props) is dict:
 			self.props = dict(props)
@@ -53,7 +53,8 @@ class Fsa(Model):
 		# Alphabet is the power set of propositions, where each element
 		# is a symbol that corresponds to a tuple of propositions
 		# Note: range goes upto rhs-1
-		self.alphabet = set(range(0, 2 ** len(self.props)))
+		self.alphabet = set(range(1, 2 ** len(self.props)+1))
+		self._dfa = AutoDFA.empty_language(set(self.alphabet))
 	
 	def __repr__(self):
 		return '''
@@ -64,264 +65,216 @@ Props: {props}
 Alphabet: {alphabet} 
 Initial: {init}
 Final: {final}
-Nodes: {nodes}
-Edges: {edges}
+States: {states}
+Transitions: {transitions}
 		'''.format(name=self.name, directed=self.directed, multi=self.multi,
 				   props=self.props, alphabet=self.alphabet,
-				   init=self.init.keys(), final=self.final,
-				   nodes=self.g.nodes(data=True),
-				   edges=self.g.edges(data=True))
+				   init=self.init.keys(), final=set(self.final),
+				   states=self.states,
+				   transitions=sum(len(v) for v in self.transitions.values()))
 	
 	def clone(self):
 		ret = Fsa(self.props, self.directed, self.multi)
-		ret.g = self.g.copy()
 		ret.name = str(self.name)
-		ret.init = dict(self.init)
-		ret.final = set(self.final)
+		ret._dfa = self._dfa
+		ret._allow_partial = self._allow_partial
 		if hasattr(self, 'tree'):
 			ret.tree = copy.deepcopy(self.tree)
 		if hasattr(self, 'kind'):
 			ret.kind = self.kind
 		return ret
 
-	@staticmethod
-	def infix_formula_to_prefix(formula):
-		# This function expects a string where operators and parantheses 
-		# are seperated by single spaces, props are lower-case.
-		#
-		# Tokenizes and reverses the input string.
-		# Then, applies the infix to postfix algorithm.
-		# Finally, reverses the output string to obtain the prefix string.
-		#
-		# Infix to postfix algorithm is taken from:
-		# http://www.cs.nyu.edu/courses/fall09/V22.0102-002/lectures/InfixToPostfixExamples.pdf
-		# http://www.programmersheaven.com/2/Art_Expressions_p1
-		#
-		# Operator priorities are taken from:
-		# Principles of Model Checking by Baier, pg.232
-		# http://www.voronkov.com/lics_doc.cgi?what=chapter&n=14
-		# Logic in Computer Science by Huth and Ryan, pg.177
+	class _InitProxy(object):
+		def __init__(self, parent):
+			self._parent = parent
+		def keys(self):
+			init = self._parent._dfa.initial_state if self._parent._dfa is not None else None
+			return [] if init is None else [init]
+		def __iter__(self):
+			return iter(self.keys())
+		def items(self):
+			return [(k, 1) for k in self.keys()]
+		def __len__(self):
+			return len(self.keys())
+		def __contains__(self, key):
+			return key in self.keys()
+		def __getitem__(self, key):
+			if key in self:
+				return 1
+			raise KeyError(key)
+		def __setitem__(self, key, value):
+			self._parent._set_initial_state(key)
+		def __delitem__(self, key):
+			if key in self:
+				self._parent._set_initial_state(None)
+		def clear(self):
+			self._parent._set_initial_state(None)
 
-		# Operator priorities (higher number means higher priority)
-		operators = { "I": 0, "|" : 1, "&": 1, "U": 2, "G": 3, "F": 3, "X": 3, "!": 3}
-		output = []
-		stack = []
+	class _FinalProxy(object):
+		def __init__(self, parent):
+			self._parent = parent
+		def __iter__(self):
+			return iter(self._parent._get_final_states())
+		def __len__(self):
+			return len(self._parent._get_final_states())
+		def __contains__(self, key):
+			return key in self._parent._get_final_states()
+		def add(self, key):
+			self._parent._set_final_states(self._parent._get_final_states() | {key})
+		def discard(self, key):
+			finals = set(self._parent._get_final_states())
+			finals.discard(key)
+			self._parent._set_final_states(finals)
+		def remove(self, key):
+			finals = set(self._parent._get_final_states())
+			finals.remove(key)
+			self._parent._set_final_states(finals)
+		def clear(self):
+			self._parent._set_final_states(set())
 
-		# Remove leading, trailing, multiple white-space, and
-		# split string at whitespaces
-		formula = re.sub(r'\s+',' ',formula).strip().split()
+	def _get_final_states(self):
+		return set() if self._dfa is None else set(self._dfa.final_states)
 
-		# Reverse the input
-		formula.reverse()
+	def _set_initial_state(self, initial_state):
+		if initial_state is None:
+			self._dfa = AutoDFA.empty_language(set(self.alphabet))
+			return
+		transitions = {state: dict(lookup) for state, lookup in self.transitions.items()}
+		states = set()
+		for src, lookup in transitions.items():
+			states.add(src)
+			states.update(lookup.values())
+		states |= set(self._get_final_states()) | {initial_state}
+		for state in states:
+			transitions.setdefault(state, {})
+		self._dfa = AutoDFA(
+			states=states,
+			input_symbols=set(self.alphabet),
+			transitions=transitions,
+			initial_state=initial_state,
+			final_states=set(self._get_final_states()),
+			allow_partial=self._allow_partial,
+		)
 
-		# Invert the parantheses
-		for i in range(0,len(formula)):
-			if formula[i] == '(':
-				formula[i] = ')'
-			elif formula[i] == ')':
-				formula[i] = '('
+	def _set_final_states(self, finals):
+		initial_state = self._dfa.initial_state if self._dfa is not None else None
+		if initial_state is None:
+			self._dfa = AutoDFA.empty_language(set(self.alphabet))
+			return
+		transitions = {state: dict(lookup) for state, lookup in self.transitions.items()}
+		states = set()
+		for src, lookup in transitions.items():
+			states.add(src)
+			states.update(lookup.values())
+		states |= set(finals) | {initial_state}
+		for state in states:
+			transitions.setdefault(state, {})
+		self._dfa = AutoDFA(
+			states=states,
+			input_symbols=set(self.alphabet),
+			transitions=transitions,
+			initial_state=initial_state,
+			final_states=set(finals),
+			allow_partial=self._allow_partial,
+		)
 
-		# Infix to postfix conversion
-		for entry in formula:
+	@property
+	def init(self):
+		return Fsa._InitProxy(self)
 
-			if entry == ')':
-				# Closing paranthesis: Pop from stack until matching '('
-				popped = stack.pop()
-				while stack and popped != '(':
-					output.append(popped)
-					popped = stack.pop()
+	@init.setter
+	def init(self, value):
+		if not value:
+			self._set_initial_state(None)
+			return
+		self._set_initial_state(next(iter(value.keys())))
 
-			elif entry == '(':
-				# Opening paranthesis: Push to stack
-				# '(' has the highest precedence when in the input
-				stack.append(entry)
+	@property
+	def final(self):
+		return Fsa._FinalProxy(self)
 
-			elif entry not in operators:
-				# Entry is an operand: append to output
-				output.append(entry)
+	@final.setter
+	def final(self, value):
+		self._set_final_states(set(value))
 
-			else:
-				# Operator: Push to stack appropriately
-				while True:
-					if not stack or stack[-1] == '(':
-						# Push to stack if empty or top is '('
-						# '(' has the lowest precedence when in the stack
-						stack.append(entry)
-						break
-					elif operators[stack[-1]] < operators[entry]:
-						# Push to stack if prio of top of the stack
-						# is lower than the current entry
-						stack.append(entry)
-						break
-					else:
-						# Pop from stack and try again
-						popped = stack.pop()
-						output.append(popped)
+	@property
+	def states(self):
+		return set() if self._dfa is None else set(self._dfa.states)
 
-		# Pop remaining entries from the stack
-		while stack:
-			popped = stack.pop()
-			output.append(popped)
+	@property
+	def transitions(self):
+		if self._dfa is None:
+			return {}
+		return {state: dict(lookup) for state, lookup in self._dfa.transitions.items()}
 
-		# Reverse the order and join entries w/ space
-		output.reverse()
-		formula = ' '.join(output)
+	def iter_transitions(self):
+		for src, lookup in self.transitions.items():
+			for symbol, dest in lookup.items():
+				yield src, dest, symbol
 
-		return formula
+	def size(self):
+		return (len(self.states), sum(len(v) for v in self.transitions.values()))
 
-	def fsa_from_cosafe_formula(self, formula, load=False):
-		if not scheck_binary:
-			raise RuntimeError('scheck binary is not available. Install or bundle LOMAP binaries to use fsa_from_cosafe_formula().')
+	def has_transition(self, src, dest):
+		return any(d == dest for d in self.transitions.get(src, {}).values())
 
-		# scheck expects a prefix co-safe ltl formula w/ props: p0, p1, ...
+	def transition_symbols(self, src, dest):
+		return {symbol for symbol, dst in self.transitions.get(src, {}).items() if dst == dest}
 
-		# Get the set of propositions
-		props = re.sub(r'[IGFX!\(\)&|U]', ' ', formula)
-		# TODO: implement true/false support
-		props = set(re.sub(r'\s+', ' ', props).strip().split())
+	def add_transition(self, src, symbol, dest):
+		states = set(self.states) | {src, dest}
+		transitions = {state: dict(self.transitions.get(state, {})) for state in states}
+		transitions.setdefault(src, {})[symbol] = dest
+		initial_state = self._dfa.initial_state if self._dfa is not None else src
+		finals = set(self.final)
+		self._dfa = AutoDFA(
+			states=states,
+			input_symbols=set(self.alphabet),
+			transitions=transitions,
+			initial_state=initial_state,
+			final_states=finals,
+			allow_partial=self._allow_partial,
+		)
 
-		# Form the bitmap dictionary of each proposition
-		# Note: range goes upto rhs-1
-		self.props = dict(zip(props, map(lambda x: 2 ** x, range(0, len(props)))))
-		self.name = 'FSA corresponding to formula: %s' % (formula)
-		self.final = set()
-		self.init = {}
+	def add_transition_symbols(self, src, symbols, dest):
+		states = set(self.states) | {src, dest}
+		transitions = {state: dict(self.transitions.get(state, {})) for state in states}
+		transitions.setdefault(src, {})
+		for symbol in symbols:
+			transitions[src][symbol] = dest
+		initial_state = self._dfa.initial_state if self._dfa is not None else src
+		finals = set(self.final)
+		self._dfa = AutoDFA(
+			states=states,
+			input_symbols=set(self.alphabet),
+			transitions=transitions,
+			initial_state=initial_state,
+			final_states=finals,
+			allow_partial=self._allow_partial,
+		)
 
-		# Alphabet is the power set of propositions, where each element
-		# is a symbol that corresponds to a tuple of propositions
-		# Note: range goes upto rhs-1
-		self.alphabet = set(range(0, 2 ** len(self.props)))
+	def _sync_from_auto(self, auto_dfa: AutoDFA):
+		self.alphabet = set(auto_dfa.input_symbols)
+		self._dfa = auto_dfa
+		self._allow_partial = True
 
-		# Prepare from/to scheck conversion dictionaries
-		i = 0
-		to_scheck = dict()
-		from_scheck = dict()
-		for p in props:
-			scheck_p = 'p%d'%i
-			from_scheck[scheck_p] = p
-			to_scheck[p] = scheck_p
-			i += 1
+	@classmethod
+	def from_automata_dfa(cls, auto_dfa: AutoDFA, props, template=None):
+		fsa = cls(props, directed=True, multi=False)
+		fsa.name = getattr(template, 'name', 'automata-lib DFA')
+		if template is not None:
+			if hasattr(template, 'kind'):
+				fsa.kind = template.kind
+			if hasattr(template, 'tree'):
+				fsa.tree = copy.deepcopy(template.tree)
+		fsa._sync_from_auto(auto_dfa)
+		return fsa
 
-		# Convert infix to prefix
-		scheck_formula = Fsa.infix_formula_to_prefix(formula)
-		# Scheck expect implies operator (I) to be lower-case
-		scheck_formula = ''.join([i if i != 'I' else 'i' for i in scheck_formula])
+	def to_automata_dfa(self) -> AutoDFA:
+		if self._dfa is None:
+			self._dfa = AutoDFA.empty_language(set(self.alphabet))
+		return self._dfa
 
-		# Convert formula props to scheck props
-		for k,v in to_scheck.items():
-			scheck_formula = scheck_formula.replace(k, v)
-
-		# Write formula to temporary file to be read by scheck
-		import os, sys
-		import tempfile
-
-		if load and os.path.isfile(load): # load already computed fsa from file
-			with open(load, 'r') as fin:
-				lines = fin.readline()
-				lines = eval(lines.strip())
-		else: # compute fsa using scheck
-			delete = True
-			if sys.platform == 'win32': # windows hack
-				delete = False
-	
-			tf = tempfile.NamedTemporaryFile(delete=delete)
-			tf.write(scheck_formula)
-			tf.flush()
-
-			# Execute scheck and get output
-			try:
-				lines = sp.check_output([scheck_binary, '-s', '-d', tf.name]).splitlines()
-			except Exception as ex:
-				raise Exception(__name__, "Problem running %s: '%s'" % (scheck_binary, ex))
-
-			# Close temp file (automatically deleted)
-			tf.close()
-		
-			if not delete: # windows hack
-				os.remove(tf.name)
-			
-		if load and not os.path.isfile(load): # save computed fsa
-			with open(load, 'w') as fout:
-				print>>fout, lines
-
-
-		# Convert lines to list after leading/trailing spaces
-		lines = map(lambda x: x.strip(), lines)
-		#for l in lines: print l
-		#print '###############'
-
-		# 1st line: "NUM_OF_STATES NUM_OF_ACCEPTING_STATES"
-		# if NUM_OF_ACCEPTING_STATES is 0, all states are accepting
-		l = lines.pop(0)
-		state_cnt, final_cnt = map(int, l.split())
-		if final_cnt == 0:
-			final_cnt = state_cnt
-			all_accepting = True
-		else:
-			all_accepting = False
-
-		# Set of remaining states
-		rem_states = set(['%s'%i for i in range(0,state_cnt)])
-
-		# Parse state defs
-		while True:
-			# 1st part: "STATE_NAME IS_INITIAL -1" for regular states
-			# "STATE_NAME IS_INITIAL ACCEPTANCE_SET -1" for final states
-			l = lines.pop(0).strip().split()
-			src = l[0]
-			is_initial = True if l[1] != '0' else False
-			is_final = True if len(l) > 3 else False
-
-			# Mark as done
-			rem_states.remove(src)
-
-			# Mark as initial/final if required
-			if is_initial:
-				self.init[src] = 1
-			if is_final:
-				self.final.add(src)
-
-			while True:
-				# 2nd part: "DEST PREFIX_GUARD_FORMULA" 
-				l = lines.pop(0).strip().split()
-				if l == ['-1']:
-					# Done w/ this state
-					break
-				dest = l[0]
-				l.pop(0)
-				guard = ''
-				# Now l holds the guard in prefix form
-				if l == ['t']:
-					guard = '(1)'
-				else:
-					l.reverse()
-					stack = []
-					for e in l:
-						if e in ['&', '|']:
-							op1 = stack.pop()
-							op2 = stack.pop()
-							stack.append('(%s %s %s)' % (op1, e, op2))
-						elif e == '!':
-							op = stack.pop()
-							stack.append('!%s' % (op))
-						else:
-							stack.append(e)
-					guard = stack.pop()
-
-				# Convert to regular props
-				for k,v in from_scheck.items():
-					guard = guard.replace(k,v)
-				bitmaps = self.get_guard_bitmap(guard)
-				#print '%s -[ %s (%s) ]-> %s (init: %s, final: %s)' % (src, guard, bitmaps, dest, is_initial, is_final)
-				self.g.add_edge(src, dest, None, {'weight': 0, 'input': bitmaps, 'guard' : guard, 'label': guard})
-
-			if not rem_states:
-				break
-
-		# We expect a deterministic FSA
-		assert(len(self.init)==1)
-
-		return
 
 	def get_guard_bitmap(self, guard):
 		"""
@@ -351,64 +304,169 @@ Edges: {edges}
 		Adds a trap state and completes the automaton. Returns True whenever a
 		trap state has been added to the automaton.
 		"""
-		trap_added = False #self.g.has_node('trap')
-		true_sink_added = False #self.g.has_node('true_sink')
-		self.g.add_node('trap')
-		self.g.add_node('true_sink')
-		for s in self.g.nodes():
-			rem_alphabet = set(self.alphabet)
-			for _, _, d in self.g.out_edges(s, data=True):
-				if 'input' in d:
-					rem_alphabet -= d['input']
-			if s in self.final:
-				if len(rem_alphabet) == len(self.alphabet):
-					self.g.add_edge(s, s, **{'weight': 0, 'input': rem_alphabet, 'guard': '(1)', 'label': TrueRule()})
-					continue
-				if not true_sink_added: #'trap' not in self.g:
-					self.g.add_edge('true_sink', 'true_sink', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': TrueRule()})
-					true_sink_added = True
-					self.final.add('true_sink')
-				self.g.add_edge(s,'true_sink', **{'weight': 0, 'input': rem_alphabet, 'guard': 'true_sink_guard', 'label': ElseRule()})
+		# auto_dfa = self.to_automata_dfa()
+		# input_symbols = set(auto_dfa.input_symbols)
+		# states = set(auto_dfa.states)
+		# finals = set(auto_dfa.final_states)
+		# transitions = {state: dict(auto_dfa.transitions.get(state, {})) for state in states}
 
-			
-			elif rem_alphabet:
-					if not trap_added: #'trap' not in self.g:
-						self.g.add_edge('trap', 'trap', **{'weight': 0, 'input': self.alphabet, 'guard': '(1)', 'label': TrueRule()})
-						trap_added = True
-					self.g.add_edge(s,'trap', **{'weight': 0, 'input': rem_alphabet, 'guard': 'trap_guard', 'label': ElseRule()})
+		# def _unique_state(base):
+		# 	candidate = base
+		# 	suffix = 0
+		# 	while candidate in states:
+		# 		suffix += 1
+		# 		candidate = '{}_{}'.format(base, suffix)
+		# 	return candidate
 
-		if not trap_added:
-			self.g.remove_node('trap')
-			logger.info('No trap states were added.')
-		else:
-			logger.info('Trap states were added.')
-		if not true_sink_added:
-			self.g.remove_node('true_sink')
-			logger.info('No true_sinks were added.')
-		else:
-			logger.info('Trap states were added.')
-		return trap_added
+		# trap_state = _unique_state('trap')
+		# true_sink = _unique_state('true_sink')
+		# trap_added = False
+		# true_sink_added = False
+
+		# for state in list(states):
+		# 	missing = input_symbols - set(transitions.get(state, {}).keys())
+		# 	if not missing:
+		# 		continue
+		# 	if state in finals:
+		# 		if not true_sink_added:
+		# 			states.add(true_sink)
+		# 			transitions[true_sink] = {sym: true_sink for sym in input_symbols}
+		# 			finals.add(true_sink)
+		# 			true_sink_added = True
+		# 		for sym in missing:
+		# 			transitions.setdefault(state, {})[sym] = true_sink
+		# 	else:
+		# 		if not trap_added:
+		# 			states.add(trap_state)
+		# 			transitions[trap_state] = {sym: trap_state for sym in input_symbols}
+		# 			trap_added = True
+		# 		for sym in missing:
+		# 			transitions.setdefault(state, {})[sym] = trap_state
+
+		# if not trap_added and not true_sink_added:
+		# 	logger.info('No trap states were added.')
+		# 	return False
+
+		# completed = AutoDFA(
+		# 	states=states,
+		# 	input_symbols=input_symbols,
+		# 	transitions=transitions,
+		# 	initial_state=auto_dfa.initial_state,
+		# 	final_states=finals,
+		# 	allow_partial=False,
+		# )
+		# self._sync_from_auto(completed)
+		# logger.info('Trap states were added.' if trap_added else 'No trap states were added.')
+		# logger.info('True sink states were added.' if true_sink_added else 'No true_sinks were added.')
+		self._dfa = self._dfa.to_complete()
+		return None
 	
 	def remove_trap_states(self):
 		'''
 		Removes all states of the automaton which do not reach a final state.
 		Returns True whenever trap states have been removed from the automaton.
 		'''
-		# add virtual state which has incoming edges from all final states
-		self.g.add_edges_from([(state, 'virtual') for state in self.final])
-		# compute trap states
-		trap_states = set(self.g.nodes())
-		trap_states -= set(nx.shortest_path_length(self.g, target='virtual').keys())
-		# remove trap state and virtual state
-		self.g.remove_nodes_from(trap_states | set(['virtual']))
-		return len(trap_states - set(['virtual'])) == 0
+		auto_dfa = self.to_automata_dfa()
+		states = set(auto_dfa.states)
+		finals = set(auto_dfa.final_states)
+		transitions = {state: dict(auto_dfa.transitions.get(state, {})) for state in states}
+
+		reverse = {state: set() for state in states}
+		for src, lookup in transitions.items():
+			for _, dest in lookup.items():
+				reverse.setdefault(dest, set()).add(src)
+
+		reachable = set()
+		stack = list(finals)
+		while stack:
+			state = stack.pop()
+			if state in reachable:
+				continue
+			reachable.add(state)
+			stack.extend(reverse.get(state, set()))
+
+		kept = reachable & states
+		removed = states - kept
+		if auto_dfa.initial_state not in kept:
+			kept = set()
+
+		new_transitions = {
+			state: {sym: dest for sym, dest in transitions.get(state, {}).items() if dest in kept}
+			for state in kept
+		}
+		pruned = AutoDFA(
+			states=kept or {auto_dfa.initial_state},
+			input_symbols=set(auto_dfa.input_symbols),
+			transitions=new_transitions if kept else {auto_dfa.initial_state: {}},
+			initial_state=auto_dfa.initial_state,
+			final_states=finals & kept,
+			allow_partial=True,
+		)
+		self._sync_from_auto(pruned)
+		return len(removed) == 0
+
+	def unify_accepting_states(self, new_state='accept'):
+		'''
+		Unifies all accepting states into a single accepting state.
+		
+		Any edge leading to any accepting state will be redirected to the new
+		accepting state, and all edges leaving any accepting state will be
+		converted into self-loops on the new accepting state.
+		Returns the name of the new accepting state, or None if there were no
+		accepting states.
+		'''
+		accepting = set(self.final)
+		if not accepting:
+			return None
+
+		base_name = 'accept' if new_state is None else str(new_state)
+		candidate = base_name
+		suffix = 0
+		states = set(self.states)
+		while candidate in states:
+			suffix += 1
+			candidate = '{}_{}'.format(base_name, suffix)
+		new_state = candidate
+		states.add(new_state)
+
+		transitions = {state: dict(self.transitions.get(state, {})) for state in states}
+		transitions.setdefault(new_state, {})
+
+		for src, lookup in transitions.items():
+			for symbol, dest in list(lookup.items()):
+				if dest in accepting:
+					lookup[symbol] = new_state
+
+		for symbol in self.alphabet:
+			transitions[new_state][symbol] = new_state
+
+		removable = accepting - set(self.init.keys())
+		states -= removable
+		for state in removable:
+			transitions.pop(state, None)
+		for src in list(transitions.keys()):
+			transitions[src] = {sym: dst for sym, dst in transitions[src].items() if dst in states}
+
+		if self.init:
+			init_state = next(iter(self.init.keys()))
+			if init_state in accepting:
+				self.init = {new_state: 1}
+		self._dfa = AutoDFA(
+			states=states,
+			input_symbols=set(self.alphabet),
+			transitions=transitions,
+			initial_state=next(iter(self.init.keys())) if self.init else new_state,
+			final_states=set([new_state]),
+			allow_partial=self._allow_partial,
+		)
+		return new_state
 
 	def symbols_w_prop(self, prop):
 		"""
 		Returns symbols from the automaton's alphabet which contain the given
 		atomic proposition.
 		"""
-		return set(filter(lambda symbol: True if self.props[prop] & symbol else False, self.alphabet))
+		return set(filter(lambda symbol: True if self.props[prop] & (symbol - 1) else False, self.alphabet))
 
 	def symbols_wo_prop(self, prop):
 		"""
@@ -417,53 +475,11 @@ Edges: {edges}
 		"""
 		return self.alphabet.difference(self.symbols_w_prop(prop))
 
-	def _normalize_state_set(self, states):
-		"""
-		Normalizes a state or a collection of states to a set.
-		"""
-		if isinstance(states, (set, frozenset)):
-			return set(states)
-		return set([states])
-
-	def _edge_input_symbols(self, data):
-		"""
-		Returns the set of input symbols attached to an edge.
-		Epsilon edges are represented by the ``epsilon`` attribute or an empty
-		input set.
-		"""
-		if data.get('epsilon', False):
-			return set()
-		inputs = data.get('input', set())
-		if inputs is None:
-			return set()
-		if isinstance(inputs, (set, frozenset, list, tuple)):
-			return set(inputs)
-		return set([inputs])
-
-	def epsilon_closure(self, states):
-		"""
-		Returns the epsilon-closure of the given state or set of states.
-		For deterministic FSAs without epsilon transitions this is just the
-		input state set.
-		"""
-		closure = self._normalize_state_set(states)
-		stack = list(closure)
-		while stack:
-			state = stack.pop()
-			for _, next_state, data in self.g.out_edges(state, data=True):
-				if not data.get('epsilon', False) and self._edge_input_symbols(data):
-					continue
-				if next_state not in closure:
-					closure.add(next_state)
-					stack.append(next_state)
-		return closure
-
-
 	def bitmap_of_props(self, props):
 		"""
 		Returns bitmap corresponding the set of atomic propositions.
 		"""
-		return reduce(op.or_, [self.props.get(p, 0) for p in props], 0)
+		return reduce(op.or_, [self.props.get(p, 0) for p in props], 0) + 1
 
 	def next_states_of_fsa(self, q, props):
 		"""
@@ -471,9 +487,8 @@ Edges: {edges}
 		"""
 		# Get the bitmap representation of props
 		prop_bitmap = self.bitmap_of_props(props)
-		# Return an array of next states
-		return [v for _, v, d in self.g.out_edges(q, data=True)
-												   if prop_bitmap in d['input']]
+		dest = self.transitions.get(q, {}).get(prop_bitmap)
+		return [dest] if dest is not None else []
 
 	def determinize(self):
 		"""
@@ -482,65 +497,12 @@ Edges: {edges}
 		The method supports epsilon transitions encoded by an edge attribute
 		``epsilon=True`` or by an empty ``input`` set.
 		"""
+		if not self.init:
+			return Fsa(self.props, self.directed, False)
+
+		auto_dfa = self.to_automata_dfa()
 		det = Fsa(self.props, self.directed, False)
 		det.name = 'Determinized %s' % self.name
-		det.props = dict(self.props)
-		det.alphabet = set(self.alphabet)
-
-		if not self.init:
-			return det
-
-		start_subset = frozenset(self.epsilon_closure(set(self.init.keys())))
-		if not start_subset:
-			return det
-
-		subset_to_state = {start_subset: 0}
-		state_to_subset = [start_subset]
-		det.init[0] = 1
-		det.g.add_node(0, subset=start_subset)
-		if start_subset & self.final:
-			det.final.add(0)
-
-		stack = deque([start_subset])
-		while stack:
-			current_subset = stack.pop()
-			current_state = subset_to_state[current_subset]
-
-			transitions = dict()
-			for state in current_subset:
-				for _, next_state, data in self.g.out_edges(state, data=True):
-					inputs = self._edge_input_symbols(data)
-					if not inputs:
-						continue
-					for symbol in inputs:
-						if symbol not in transitions:
-							transitions[symbol] = set()
-						transitions[symbol].add(next_state)
-
-			destinations = dict()
-			for symbol, next_states in transitions.items():
-				next_subset = frozenset(self.epsilon_closure(next_states))
-				if next_subset not in destinations:
-					destinations[next_subset] = set()
-				destinations[next_subset].add(symbol)
-
-			for next_subset, symbols in destinations.items():
-				if next_subset not in subset_to_state:
-					next_state = len(state_to_subset)
-					subset_to_state[next_subset] = next_state
-					state_to_subset.append(next_subset)
-					det.g.add_node(next_state, subset=next_subset)
-					if next_subset & self.final:
-						det.final.add(next_state)
-					stack.append(next_subset)
-				else:
-					next_state = subset_to_state[next_subset]
-
-				det.g.add_edge(current_state, next_state,
-								 weight=0,
-								 input=symbols,
-								 guard=str(symbols),
-								 label=str(symbols))
-
+		det._sync_from_auto(auto_dfa)
 		return det
 

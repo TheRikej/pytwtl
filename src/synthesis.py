@@ -307,9 +307,9 @@ def partial_control_policies(pa, dfa, init, finish, constraint=None):
             sat_paths.extend([path for p, path in paths.iteritems()
                 if p[1] in finish and # is final
                 path[-2][1] in constraint.keys() and # is in restriction
-                dfa.g.has_edge(path[-2][1], p[1]) and # there is an edge
+                dfa.has_transition(path[-2][1], p[1]) and # there is an edge
                 # the edge activates properly
-                dfa.g[path[-2][1]][p[1]]['input'] <= constraint[path[-2][1]]])
+                dfa.transition_symbols(path[-2][1], p[1]) <= constraint[path[-2][1]]])
     assert len(sat_paths) == len(set(map(tuple, sat_paths)))
     
     # prune paths which intersect the set of final states more than once
@@ -357,7 +357,7 @@ def partial_control_policies2(pa, dfa, init, finish, constraint=None):
                if p[1] in finish and # is final
                   path[-2][1] in C and # is in restriction
                   # the edge activates properly
-                  dfa.g[path[-2][1]][p[1]]['input'] <= constraint[path[-2][1]]])
+                  dfa.transition_symbols(path[-2][1], p[1]) <= constraint[path[-2][1]]])
         
     return sat_paths
 
