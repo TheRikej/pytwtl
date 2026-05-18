@@ -8,8 +8,8 @@ This library is a Python 3.12 implementation of PyTWTL, which provides the algor
 
 The parsing of TWTL formulae is performed using the ANTLRv4 framework. The package provides grammar files which may be used to generate lexers and parsers for other programming languages such as Java, C/C++, Ruby.
 
-<h3>Download original python 2.7 PyTWTL library</h3>
-<a href="/hyness/files/2016/02/pytwtl.zip">Download</a>
+<h3></h3>
+<a href="https://github.com/TheRikej/pytwtl">GitHub</a>
 
 <h3>Requirements</h3>
 The package is written for Python 3.12. The following Python packages are required (see <code>requirements.txt</code> for the exact set and versions):
