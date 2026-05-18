@@ -6,20 +6,13 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from dfa import (
-    DFAType,
-    Op,
     accept_prop,
     complement,
     concatenation,
     eventually,
-    getDFAType,
-    getOptimizationFlag,
     hold,
     intersection,
     repeat,
-    setDFAType,
-    setOptimizationFlag,
-    truncate_dfa,
     union,
     within,
 )
@@ -27,15 +20,6 @@ from lomap import Fsa
 
 
 PROPS = ['A', 'B', 'C']
-
-
-@pytest.fixture(autouse=True)
-def _restore_globals():
-    prev_type = getDFAType()
-    prev_opt = getOptimizationFlag()
-    yield
-    setDFAType(prev_type)
-    setOptimizationFlag(prev_opt)
 
 
 def _outgoing_symbols(dfa):
@@ -98,34 +82,21 @@ def test_intersection_builds_dfa_in_both_modes():
     dfa1 = hold(PROPS, 'A', duration=0)
     dfa2 = hold(PROPS, 'B', duration=0)
 
-    setDFAType(DFAType.Normal)
-    normal = intersection(dfa1.clone(), dfa2.clone())
-    assert len(normal.init) == 1
-    assert len(normal.final) == 1
-
-    setDFAType(DFAType.Infinity)
-    inf = intersection(dfa1.clone(), dfa2.clone())
-    assert len(inf.init) == 1
-    assert len(inf.final) == 1
+    dfa = intersection(dfa1.clone(), dfa2.clone())
+    assert len(dfa.init) == 1
+    assert len(dfa.final) == 1
 
 
 def test_union_builds_dfa_in_both_modes():
     dfa1 = hold(PROPS, 'A', duration=0)
     dfa2 = hold(PROPS, 'B', duration=0)
 
-    setDFAType(DFAType.Normal)
     normal = union(dfa1.clone(), dfa2.clone())
     assert len(normal.init) == 1
     assert len(normal.final) == 1
 
-    setDFAType(DFAType.Infinity)
-    inf = union(dfa1.clone(), dfa2.clone())
-    assert len(inf.init) == 1
-    # assert len(inf.final) == 1
-
 
 def test_within_normal_dispatches_to_repeat():
-    setDFAType(DFAType.Normal)
     phi = hold(PROPS, 'A', duration=0)
     dfa = within(phi, low=0, high=2)
     assert isinstance(dfa, Fsa)
@@ -165,16 +136,8 @@ def test_repeat_low_positive_builds_dfa():
     assert len(dfa.final) == 1
 
 
-def test_truncate_dfa_reduces_reachable_edges():
-    dfa = hold(PROPS, 'A', duration=2)
-    before = dfa.size()[1]
-    out = truncate_dfa(dfa, cutoff=1)
-    assert isinstance(out, Fsa)
-    assert out.size()[1] <= before
-
 
 def test_public_combinators_return_fsa_instances_where_successful():
-    setDFAType(DFAType.Infinity)
     a = hold(PROPS, 'A', duration=0)
     b = hold(PROPS, 'B', duration=0)
 
@@ -188,7 +151,6 @@ def test_public_combinators_return_fsa_instances_where_successful():
 
 
 def test_intersection_and_union_have_deterministic_single_initial_state():
-    setDFAType(DFAType.Infinity)
     dfa1 = hold(PROPS, 'A', duration=0)
     dfa2 = hold(PROPS, 'B', duration=0)
 
@@ -200,7 +162,6 @@ def test_intersection_and_union_have_deterministic_single_initial_state():
 
 
 def test_union_merges_multiple_final_states_to_one():
-    setDFAType(DFAType.Infinity)
     # Distinct formulas increase the chance of >1 finals before merge.
     dfa1 = hold(PROPS, 'A', duration=1)
     dfa2 = hold(PROPS, 'B', duration=1)
@@ -251,7 +212,6 @@ def test_hold_negation_language_behavior(word, expected):
 
 
 def test_intersection_language_requires_both_subformulas_same_step():
-    setDFAType(DFAType.Infinity)
     dfa = intersection(hold(PROPS, 'A', duration=0), hold(PROPS, 'B', duration=0))
     assert _accepts(dfa, [{'A', 'B'}]) is True
     assert _accepts(dfa, [{'A'}]) is False
@@ -259,7 +219,6 @@ def test_intersection_language_requires_both_subformulas_same_step():
 
 
 def test_union_language_accepts_either_branch_single_step():
-    setDFAType(DFAType.Infinity)
     dfa = union(hold(PROPS, 'A', duration=0), hold(PROPS, 'B', duration=0))
     assert _accepts(dfa, [{'A'}]) is True
     assert _accepts(dfa, [{'B'}]) is True
@@ -268,7 +227,6 @@ def test_union_language_accepts_either_branch_single_step():
 
 
 def test_union_of_complements_matches_not_a_or_not_b():
-    setDFAType(DFAType.Infinity)
     not_a = complement(hold(PROPS, 'A', duration=0))
     not_b = complement(hold(PROPS, 'B', duration=0))
     dfa = union(not_a, not_b)
@@ -280,7 +238,6 @@ def test_union_of_complements_matches_not_a_or_not_b():
 
 
 def test_intersection_of_complements_matches_not_a_and_not_b():
-    setDFAType(DFAType.Infinity)
     not_a = complement(hold(PROPS, 'A', duration=0))
     not_b = complement(hold(PROPS, 'B', duration=0))
     dfa = intersection(not_a, not_b)

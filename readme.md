@@ -44,8 +44,8 @@ An ANT build file <code>build.xml</code> is provided to generate the lexer and p
 
 <h3>License & Copying</h3>
 <pre>Copyright (C) 2015-2016  Cristian Ioan Vasile <cvasile@bu.edu>
-Hybrid and Networked Systems (HyNeSs) Group, BU Robotics Lab,
-Boston University. Modified and extended by David Kajan, as part of master's thesis on Masaryk's university
+Hybrid and Networked Systems (HyNeSs) Group, BU Robotics Lab, Boston University.
+Modified and extended by David Kajan, as part of master's thesis at Masaryk's university, 2026
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

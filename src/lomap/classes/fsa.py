@@ -1,4 +1,6 @@
 # Copyright (C) 2012-2015, Alphan Ulusoy (alphan@bu.edu)
+#
+# Modified in 2026 by David Kajan, Masaryk University, Brno
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,10 +19,8 @@
 from functools import reduce
 import copy
 import re
-import subprocess as sp
 import operator as op
 from automata.fa.dfa import DFA as AutoDFA
-from . import scheck_binary
 import logging
 
 # Logger configuration
@@ -299,65 +299,11 @@ Transitions: {transitions}
 
 		return eval(guard)
 
-	def 	add_trap_state(self):
+	def add_trap_state(self):
 		"""
 		Adds a trap state and completes the automaton. Returns True whenever a
 		trap state has been added to the automaton.
 		"""
-		# auto_dfa = self.to_automata_dfa()
-		# input_symbols = set(auto_dfa.input_symbols)
-		# states = set(auto_dfa.states)
-		# finals = set(auto_dfa.final_states)
-		# transitions = {state: dict(auto_dfa.transitions.get(state, {})) for state in states}
-
-		# def _unique_state(base):
-		# 	candidate = base
-		# 	suffix = 0
-		# 	while candidate in states:
-		# 		suffix += 1
-		# 		candidate = '{}_{}'.format(base, suffix)
-		# 	return candidate
-
-		# trap_state = _unique_state('trap')
-		# true_sink = _unique_state('true_sink')
-		# trap_added = False
-		# true_sink_added = False
-
-		# for state in list(states):
-		# 	missing = input_symbols - set(transitions.get(state, {}).keys())
-		# 	if not missing:
-		# 		continue
-		# 	if state in finals:
-		# 		if not true_sink_added:
-		# 			states.add(true_sink)
-		# 			transitions[true_sink] = {sym: true_sink for sym in input_symbols}
-		# 			finals.add(true_sink)
-		# 			true_sink_added = True
-		# 		for sym in missing:
-		# 			transitions.setdefault(state, {})[sym] = true_sink
-		# 	else:
-		# 		if not trap_added:
-		# 			states.add(trap_state)
-		# 			transitions[trap_state] = {sym: trap_state for sym in input_symbols}
-		# 			trap_added = True
-		# 		for sym in missing:
-		# 			transitions.setdefault(state, {})[sym] = trap_state
-
-		# if not trap_added and not true_sink_added:
-		# 	logger.info('No trap states were added.')
-		# 	return False
-
-		# completed = AutoDFA(
-		# 	states=states,
-		# 	input_symbols=input_symbols,
-		# 	transitions=transitions,
-		# 	initial_state=auto_dfa.initial_state,
-		# 	final_states=finals,
-		# 	allow_partial=False,
-		# )
-		# self._sync_from_auto(completed)
-		# logger.info('Trap states were added.' if trap_added else 'No trap states were added.')
-		# logger.info('True sink states were added.' if true_sink_added else 'No true_sinks were added.')
 		self._dfa = self._dfa.to_complete()
 		return None
 	

@@ -24,74 +24,74 @@ class ParsedFormula:
     alphabet: set[str]
 
 
-class _NormVisitor(TwtlVisitor):
-    def visitFormula(self, ctx):
-        return self.visit(ctx.disjunction())
+# class _NormVisitor(TwtlVisitor):
+#     def visitFormula(self, ctx):
+#         return self.visit(ctx.disjunction())
 
-    def visitDisjunction(self, ctx):
-        values = [self.visit(node) for node in ctx.conjunction()]
-        acc = values[0]
-        for value in values[1:]:
-            acc = (min(acc[0], value[0]), max(acc[1], value[1]))
-        return acc
+#     def visitDisjunction(self, ctx):
+#         values = [self.visit(node) for node in ctx.conjunction()]
+#         acc = values[0]
+#         for value in values[1:]:
+#             acc = (min(acc[0], value[0]), max(acc[1], value[1]))
+#         return acc
 
-    def visitConjunction(self, ctx):
-        values = [self.visit(node) for node in ctx.concatenation()]
-        acc = values[0]
-        for value in values[1:]:
-            acc = (max(acc[0], value[0]), max(acc[1], value[1]))
-        return acc
+#     def visitConjunction(self, ctx):
+#         values = [self.visit(node) for node in ctx.concatenation()]
+#         acc = values[0]
+#         for value in values[1:]:
+#             acc = (max(acc[0], value[0]), max(acc[1], value[1]))
+#         return acc
 
-    def visitConcatenation(self, ctx):
-        values = [self.visit(node) for node in ctx.temporal()]
-        acc = values[0]
-        for value in values[1:]:
-            acc = (acc[0] + value[0] + 1, acc[1] + value[1] + 1)
-        return acc
+#     def visitConcatenation(self, ctx):
+#         values = [self.visit(node) for node in ctx.temporal()]
+#         acc = values[0]
+#         for value in values[1:]:
+#             acc = (acc[0] + value[0] + 1, acc[1] + value[1] + 1)
+#         return acc
 
-    def visitHoldProp(self, ctx):
-        duration = int(ctx.INT().getText())
-        return (duration, duration)
+#     def visitHoldProp(self, ctx):
+#         duration = int(ctx.INT().getText())
+#         return (duration, duration)
 
-    def visitHoldTrue(self, ctx):
-        duration = int(ctx.INT().getText())
-        return (duration, duration)
+#     def visitHoldTrue(self, ctx):
+#         duration = int(ctx.INT().getText())
+#         return (duration, duration)
 
-    def visitHoldFalse(self, ctx):
-        duration = int(ctx.INT().getText())
-        return (duration, duration)
+#     def visitHoldFalse(self, ctx):
+#         duration = int(ctx.INT().getText())
+#         return (duration, duration)
 
-    def visitHoldNegProp(self, ctx):
-        duration = int(ctx.INT().getText())
-        return (duration, duration)
+#     def visitHoldNegProp(self, ctx):
+#         duration = int(ctx.INT().getText())
+#         return (duration, duration)
 
-    def visitWithinExpr(self, ctx):
-        phi = self.visit(ctx.formula())
-        low = int(ctx.INT(0).getText())
-        high = int(ctx.INT(1).getText()) if len(ctx.INT()) > 1 else None
-        if high is not None and phi[1] > high - low:
-            raise ValueError("Within operator deadline is invalid!")
-        return (low + phi[0], high)
+#     def visitWithinExpr(self, ctx):
+#         phi = self.visit(ctx.formula())
+#         low = int(ctx.INT(0).getText())
+#         high = int(ctx.INT(1).getText()) if len(ctx.INT()) > 1 else None
+#         if high is not None and phi[1] > high - low:
+#             raise ValueError("Within operator deadline is invalid!")
+#         return (low + phi[0], high)
 
-    def visitTemporalNegation(self, ctx):
-        return self.visit(ctx.negation())
+#     def visitTemporalNegation(self, ctx):
+#         return self.visit(ctx.negation())
 
-    def visitNegation(self, ctx):
-        if ctx.PROP() is not None:
-            dfa = accept_prop(self.props, prop=ctx.PROP().getText())
-            return complement(dfa) if ctx.NOT() is not None else dfa
-        if ctx.TRUE() is not None:
-            return accept_prop(self.props, boolean=True)
-        if ctx.FALSE() is not None:
-            return accept_prop(self.props, boolean=False)
+#     def visitNegation(self, ctx):
+#         if ctx.PROP() is not None:
+#             dfa = accept_prop(self.props, prop=ctx.PROP().getText())
+#             return complement(dfa) if ctx.NOT() is not None else dfa
+#         if ctx.TRUE() is not None:
+#             return accept_prop(self.props, boolean=True)
+#         if ctx.FALSE() is not None:
+#             return accept_prop(self.props, boolean=False)
 
-        dfa = self.visit(ctx.atom())
-        return complement(dfa) if ctx.NOT() is not None else dfa
+#         dfa = self.visit(ctx.atom())
+#         return complement(dfa) if ctx.NOT() is not None else dfa
 
-    def visitAtom(self, ctx):
-        if ctx.formula() is not None:
-            return self.visit(ctx.formula())
-        return (0, 0)
+#     def visitAtom(self, ctx):
+#         if ctx.formula() is not None:
+#             return self.visit(ctx.formula())
+#         return (0, 0)
 
 
 class _DfaVisitor(TwtlVisitor):
@@ -154,12 +154,6 @@ class _DfaVisitor(TwtlVisitor):
         return complement(dfa) if ctx.NOT() is not None else dfa
 
     def visitAtom(self, ctx):
-        # if ctx.PROP() is not None:
-        #     return accept_prop(self.props, prop=ctx.PROP().getText())
-        # if ctx.TRUE() is not None:
-        #     return accept_prop(self.props, boolean=True)
-        # if ctx.FALSE() is not None:
-        #     return accept_prop(self.props, boolean=False)
         return self.visit(ctx.formula())
 
 
@@ -180,8 +174,8 @@ def parse_formula(formula: str) -> ParsedFormula:
     return ParsedFormula(tree=prog.formula(), alphabet=alphabet)
 
 
-def evaluate_norm(tree: TwtlParser.FormulaContext) -> tuple[int, int]:
-    return _NormVisitor().visit(tree)
+# def evaluate_norm(tree: TwtlParser.FormulaContext) -> tuple[int, int]:
+#     return _NormVisitor().visit(tree)
 
 
 def evaluate_dfa(tree: TwtlParser.FormulaContext, alphabet: set[str]):

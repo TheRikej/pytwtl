@@ -164,15 +164,11 @@ class RuntimeMonitor(object):
 
         Requires pygraphviz. Writes to `path` (e.g. .png or .svg).
         """
-        try:
-            import pygraphviz as pgv
-        except Exception as exc:
-            raise RuntimeError('pygraphviz is required for visualize_graphviz().') from exc
+        import pygraphviz as pgv
 
         g = pgv.AGraph(directed=True, strict=False)
         g.graph_attr.update(rankdir='LR')
 
-        nx_g = self._nx_graph
         sccs, comp_of, dag = self._sccs, self._comp_of, self._dag
 
         current_comp = None
@@ -200,20 +196,6 @@ class RuntimeMonitor(object):
 
         for u, v in dag.edges():
             g.add_edge(u, v)
-
-        for cid, states in enumerate(sccs):
-            internal_symbols = set()
-            for state in states:
-                for symbol, next_state in self._annotation_dfa.transitions.get(state, {}).items():
-                    if comp_of.get(next_state) == cid:
-                        internal_symbols.add(symbol)
-
-            if internal_symbols:
-                if len(internal_symbols) <= 5:
-                    loop_label = ','.join(str(s) for s in sorted(internal_symbols))
-                else:
-                    loop_label = f"{len(internal_symbols)} sym"
-                g.add_edge(cid, cid, label=loop_label, penwidth=1.5)
 
         init_marker = '__init__'
         init_comp = comp_of.get(self.dfa.initial_state)
