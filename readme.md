@@ -19,7 +19,7 @@ The package is written for Python 3.12. The following Python packages are requir
     <li>matplotlib</li>
     <li>ANTLRv4 python runtime</li>
     <li>automata-lib</li>
-    <li>pygraphviz (optional, for Graphviz visualization)</li>
+    <li>pygraphviz (requires graphviz to be installed on your system)</li>
     <li>pytest (for tests)</li>
 </ul>
 Install via:
