@@ -94,7 +94,7 @@ def test_runtime_monitor_step_and_dead_transition_behavior():
     mon = RuntimeMonitor(dfa)
     v0, k0, s0 = mon.current()
     mon.dfa.show_diagram(path='monitor_automata.png', horizontal=False)
-    mon.visualize_graphviz(path='monitor_automata_test.png', layout='dot', show_current=True)
+    mon.visualize(path='monitor_automata_test.png', layout='dot', show_current=True)
     assert v0 == VERDICT_UNKNOWN
     assert k0 == math.inf
     assert s0 == 0

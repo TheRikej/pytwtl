@@ -37,9 +37,20 @@ def test_runtime_monitor_accepts_optional_high_formula_on_witness():
     step1 = mon.step(set(['A']))
     assert step1 == (VERDICT_UNKNOWN, math.inf)
 
-    mon.visualize_graphviz(path='monitor_automata_test.png', layout='dot', show_current=True)
+    mon.visualize(path='monitor_automata_test.png', layout='dot', show_current=True)
     step2 = mon.step(set(['A']))
     assert step2 == (VERDICT_TRUE, 0)
+
+    for word in [
+        [set(['A']), set(['A'])],
+        [set(), set(['A']), set(['A'])],
+        [set(['A']), set(), set(['A'])],
+    ]:
+        mon = monitor_runtime(formula='[H^0 A]^[1]')
+        verdict = None
+        for symbol in word:
+            verdict, _ = mon.step(symbol)
+        assert verdict == VERDICT_TRUE
 
 
 
@@ -53,3 +64,27 @@ def test_negated_parenthesized_formula_parses_and_keeps_tree():
     _, dfa_norm = translate('!(A | B)')
     assert _accepts(dfa_norm, [set()]) is True
     assert _accepts(dfa_norm, [{'A'}]) is False
+
+
+def test_eventually_operator_parses():
+    parse_formula('F(A)')
+
+
+def test_eventually_operator_matches_within_low_zero():
+    _, dfa_eventually = translate('F(A)')
+    _, dfa_within = translate('[A]^[0]')
+
+    words = [
+        [set()],
+        [{'A'}],
+        [set(), {'A'}],
+        [{'A'}, set()],
+        [set(), set()],
+        [{'A', 'B'}],
+        [set(), {'B'}, {'A'}],
+        [{'B'}, {'A'}],
+        [set(), set(), {'A'}],
+    ]
+
+    for word in words:
+        assert _accepts(dfa_eventually, word) == _accepts(dfa_within, word)

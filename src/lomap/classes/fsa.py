@@ -27,7 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 #logger.addHandler(logging.NullHandler())
 
-class Fsa(object):
+class Fsa:
 	"""
 	Base class for deterministic finite state automata.
 	"""

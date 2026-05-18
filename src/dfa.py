@@ -127,6 +127,9 @@ def accept_prop(props: list[str], prop:str|None=None, boolean:bool|None=None):
     for symbol in bitmaps:
         transitions[0][symbol] = 1
 
+    for symbol in input_symbols:
+        transitions[1][symbol] = 1
+
     auto_dfa = AutoDFA(
         states={0, 1},
         input_symbols=input_symbols,

@@ -174,8 +174,10 @@ def test_union_merges_multiple_final_states_to_one():
     [
         ([{'A'}], True),
         ([{'A', 'B'}], True),
+        ([{'A', 'C'}], True),
         ([set()], False),
         ([{'B'}], False),
+        ([{'B', 'C'}], False),
     ],
 )
 def test_accept_prop_language_behavior(word, expected):
@@ -187,6 +189,8 @@ def test_accept_prop_language_behavior(word, expected):
     'word, expected',
     [
         ([{'A'}, {'A'}, {'A'}], True),
+        ([{'A'}, {'A'}, {'A'}, {'A'}], True),
+        ([{'A'}, {'A'}, {'A'}, {'B'}], True),
         ([{'A'}, {'A'}, {'B'}], False),
         ([{'A'}, {'B'}, {'A'}], False),
         ([{'A'}, {'A'}], False),
@@ -202,8 +206,11 @@ def test_hold_language_behavior_duration_two(word, expected):
     [
         ([set(), {'B'}], True),
         ([{'B'}, {'C'}], True),
+        ([{'C'}, set(), {'A'}], True),
+        ([{'B'}, {'B'}, {'B'}], True),
         ([{'A'}, {'B'}], False),
         ([{'B'}, {'A'}], False),
+        ([{'A'}, {'C'}, {'C'}], False),
     ],
 )
 def test_hold_negation_language_behavior(word, expected):
@@ -271,3 +278,20 @@ def test_composed_automata_multiple_operations_remain_deterministic_from_init():
     right = eventually(hold(PROPS, 'C', duration=0), low=0)
     prod = intersection(left, right)
     assert len(prod.init) == 1
+
+
+def test_complex_operator_composition_accepts_expected_words():
+    a = hold(PROPS, 'A', duration=0)
+    b = hold(PROPS, 'B', duration=0)
+    c = hold(PROPS, 'C', duration=0)
+
+    left = union(a, b)
+    right = intersection(c, complement(hold(PROPS, 'A', duration=0)))
+    combo = concatenation(left, right)
+
+    assert _accepts(combo, [{'A'}, {'C'}]) is True
+    assert _accepts(combo, [{'B'}, {'C'}]) is True
+    assert _accepts(combo, [{'A', 'B'}, {'C'}]) is True
+    assert _accepts(combo, [{'A'}, {'A', 'C'}]) is False
+    assert _accepts(combo, [{'C'}, {'C'}]) is False
+    assert _accepts(combo, [{'B'}, set()]) is False

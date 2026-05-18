@@ -1,46 +1,33 @@
 <h3>Overview</h3>
-<strong>T</strong>ime <strong>W</strong>indow <strong>T</strong>emporal <strong>L</strong>ogic (TWTL) is a bounded temporal logic used to specify rich properties<a href="#1">[1]</a>. Relaxed versions of TWTL formulae are also considered in the sense of extending the deadlines of time windows. An automata based approach is proposed to solve synthesis, verification and learning problems. The key ingredient is a construction algorithm of annotated Deterministic Finite State Automata (DFA) from TWTL properties. See <a href="#1">[1]</a> for more details. 
+<strong>T</strong>ime <strong>W</strong>indow <strong>T</strong>emporal <strong>L</strong>ogic (TWTL) is a bounded temporal logic used to specify rich properties<a href="#1">[1]</a>. 
+This library provides support for an extention to TWTL called UTWTL, which extends TWTL with an eventually operator.
+Also provides an implementation of a runtime monitor, for simple runtime verification of traces for a given formula.
 
-This library is a python 3.12 implementation of PyTWTL, which provides an implementation of the algorithms proposed in <a href="#1">[1]</a> based on LOMAP <a href="#2">[2]</a>, ANTLRv4 <a href="#3">[3]</a> and networkx <a href="#4">[4]</a> libraries. PyTWTL implementation is released under the GPLv3 license.
-The library can be used to:
-<ul type="square">
-    <li>construct DFAs and annotated DFAs from TWTL formulae;</li>
-    <li>monitor the satisfaction of a TWTL formula;</li>
-    <li>monitor the satisfaction of an arbitrary relaxation of a TWTL formula;</li>
-    <li>compute the temporal relaxation of a trace with respect to a TWTL formula;</li>
-    <li>compute a satisfying control policy with respect to a TWTL formula;</li>
-    <li>compute a minimally relaxed control policy with respect to a TWTL formula;</li>
-    <li>verify if all traces of a system satisfy some relaxed version of a TWTL formula;</li>
-    <li>learn the parameters of a TWTL formula, i.e. the deadlines.</li>
-</ul>
+
+This library is a Python 3.12 implementation of PyTWTL, which provides the algorithms proposed in <a href="#1">[1]</a> based on LOMAP <a href="#2">[2]</a>, ANTLRv4 <a href="#3">[3]</a>, automata-lib, and networkx <a href="#4">[4]</a>. PyTWTL implementation is released under the GPLv3 license.
 
 The parsing of TWTL formulae is performed using the ANTLRv4 framework. The package provides grammar files which may be used to generate lexers and parsers for other programming languages such as Java, C/C++, Ruby.
-
-<h3>Citation</h3>
-If you use TWTL or PyTWTL, then please consider citing the reference paper:
-
-Cristian-Ioan Vasile, Derya Aksaray, and Calin Belta. <em>"Time Window Temporal Logic"</em>, arXiv preprint, <a href="http://arxiv.org/abs/1602.04294" target="_blank">arXiv:1602.04294</a>, 2016.
-<a href="/hyness/files/2016/02/twtl.txt" target="_blank"><strong>[bib]</strong></a>
 
 <h3>Download original python 2.7 PyTWTL library</h3>
 <a href="/hyness/files/2016/02/pytwtl.zip">Download</a>
 
 <h3>Requirements</h3>
-The package is written for python 3.12. The following python packages are required:
+The package is written for Python 3.12. The following Python packages are required (see <code>requirements.txt</code> for the exact set and versions):
 <ul type="square">
     <li>NumPy</li>
     <li>NetworkX</li>
-    <li>ParallelPython</li>
     <li>matplotlib</li>
-    <li>setuptools</li>
     <li>ANTLRv4 python runtime</li>
+    <li>automata-lib</li>
+    <li>pygraphviz (optional, for Graphviz visualization)</li>
+    <li>pytest (for tests)</li>
 </ul>
-You can install the packages using:
-<code>pip install --user networkx numpy matplotlib pp antlr4-python3-runtime setuptools</code>
+Install via:
+<code>pip install -r requirements.txt</code>
 
 <h3>How to Use</h3>
-See <code>examples_tcs.py</code> for examples of the algorithms and the PyTWTL API.
-An ANT build file <code>build.xml</code> is provided to generate the lexer and parser from the ANTLR4 grammar file.
+For formula syntax and runnable examples, see <code>examples_formulas.py</code>.
+An ANT build file <code>build.xml</code> is provided to regenerate the lexer and parser from the ANTLR4 grammar file. (Requires ANTLR4)
 
 <h3>License & Copying</h3>
 <pre>Copyright (C) 2015-2016  Cristian Ioan Vasile <cvasile@bu.edu>

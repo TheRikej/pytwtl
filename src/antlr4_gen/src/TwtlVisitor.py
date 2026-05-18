@@ -54,6 +54,11 @@ class TwtlVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by TwtlParser#eventuallyExpr.
+    def visitEventuallyExpr(self, ctx:TwtlParser.EventuallyExprContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by TwtlParser#withinExpr.
     def visitWithinExpr(self, ctx:TwtlParser.WithinExprContext):
         return self.visitChildren(ctx)

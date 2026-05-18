@@ -25,6 +25,7 @@ temporal
     | HOLD CARET INT TRUE                          # holdTrue
     | HOLD CARET INT FALSE                         # holdFalse
     | HOLD CARET INT NOT PROP                      # holdNegProp
+    | EVENTUALLY LPAREN formula RPAREN             # eventuallyExpr
     | LBRACK formula RBRACK CARET LBRACK INT (COMMA INT)? RBRACK # withinExpr
     | negation                                     # temporalNegation
     ;
@@ -44,6 +45,7 @@ AND: '&';
 OR: '|';
 NOT: '!';
 HOLD: 'H';
+EVENTUALLY: 'F';
 CONCAT: '*';
 CARET: '^';
 LBRACK: '[';

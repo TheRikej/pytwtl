@@ -76,6 +76,9 @@ def test_minimize_dfa_preserves_language_on_representative_words():
         [{'A'}],
         [set(), {'A'}],
         [{'A'}, set(), {'A'}],
+        [{'A'}, {'A'}],
+        [set(), set(), {'A'}],
+        [{'A'}, set(), set(), {'A'}],
     ]
     for w in words:
         assert _accepts(dfa, w) == _accepts(minimized, w)
